@@ -143,7 +143,7 @@ public class TUserController {
             motionPointsEntity.setUserId(Math.toIntExact(existingUser.getId()));
             tMotionPointsMapper.insert(motionPointsEntity);
 
-            return ResponseEntity.ok("测温中");
+            return ResponseEntity.ok(existingUser);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("更新失败: " + e.getMessage());
         }
