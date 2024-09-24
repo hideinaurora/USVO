@@ -20,8 +20,8 @@ public class WeChatConfig {
     @Bean
     public WxMpConfigStorage wxMpConfigStorage() {
         WxMpDefaultConfigImpl configStorage = new WxMpDefaultConfigImpl();
-        configStorage.setAppId("wx806c81134c32a6b5");  // 替换为你的微信公众号 AppId
-        configStorage.setSecret("0bf4558810ddba656264bce89485fd83");  // 替换为你的微信公众号 AppSecret
+        configStorage.setAppId("wxc6255cb7943f1cde");  // 替换为你的微信公众号 AppId
+        configStorage.setSecret("551409774e31f84918ce088282a17eac");  // 替换为你的微信公众号 AppSecret
         return configStorage;
     }
 }
