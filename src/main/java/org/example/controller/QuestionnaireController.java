@@ -29,7 +29,7 @@ public class QuestionnaireController {
      * @date 2023/11/23 9:28
      */
     @RequestMapping(value = "/query", method = RequestMethod.POST)
-    @RequiresPermissions(isSave = false, apiAuth = {ApiAuth.ADMIN})
+    @RequiresPermissions(isSave = false)
     public TableResponseDTO query(@RequestHeader(name = "token") String token,
                                   @RequestBody TableRequestDTO tableRequestDTO) {
         TableResponseDTO opResult = new TableResponseDTO();
@@ -48,7 +48,7 @@ public class QuestionnaireController {
      * @date 2023/11/23 9:28
      */
     @RequestMapping(value = "/add", method = RequestMethod.POST)
-    @RequiresPermissions(isSave = false, apiAuth = {ApiAuth.ADMIN})
+    @RequiresPermissions(isSave = false)
     public OpResultDTO add(@RequestHeader(name = "token") String token,
                            @RequestBody QuestionnaireDTO entity) {
         OpResultDTO opResult = new OpResultDTO();
@@ -69,7 +69,7 @@ public class QuestionnaireController {
      * @date 2023/11/23 9:28
      */
     @RequestMapping(value = "/update", method = RequestMethod.POST)
-    @RequiresPermissions(isSave = false, apiAuth = {ApiAuth.ADMIN})
+    @RequiresPermissions(isSave = false)
     public OpResultDTO update(@RequestHeader(name = "token") String token,
                               @RequestBody QuestionnaireDTO entity) {
         OpResultDTO opResult = new OpResultDTO();
@@ -91,7 +91,7 @@ public class QuestionnaireController {
      * @date 2023/11/23 9:28
      */
     @RequestMapping(value = "/remove", method = RequestMethod.POST)
-    @RequiresPermissions(isSave = false, apiAuth = {ApiAuth.ADMIN})
+    @RequiresPermissions(isSave = false)
     public OpResultDTO remove(@RequestHeader(name = "token") String token,
                               HttpServletRequest request) {
         OpResultDTO opResult = new OpResultDTO();
@@ -120,7 +120,7 @@ public class QuestionnaireController {
      * @date 2023/11/23 9:28
      */
     @RequestMapping(value = "/query/not/answer", method = RequestMethod.POST)
-    @RequiresPermissions(isSave = false, apiAuth = {ApiAuth.USER})
+    @RequiresPermissions(isSave = false)
     public OpResultDTO queryNotAnswer(@RequestHeader(name = "token") String token) {
         OpResultDTO opResult = new OpResultDTO();
         try {
@@ -140,7 +140,7 @@ public class QuestionnaireController {
      * @date 2023/11/23 9:28
      */
     @RequestMapping(value = "/query/finish/answer", method = RequestMethod.POST)
-    @RequiresPermissions(isSave = false, apiAuth = {ApiAuth.USER})
+    @RequiresPermissions(isSave = false)
     public OpResultDTO queryFinishAnswer(@RequestHeader(name = "token") String token) {
         OpResultDTO opResult = new OpResultDTO();
         try {
@@ -187,7 +187,7 @@ public class QuestionnaireController {
      * @date 2023/11/23 9:28
      */
     @RequestMapping(value = "/update/content", method = RequestMethod.POST)
-    @RequiresPermissions(isSave = false, apiAuth = {ApiAuth.ADMIN})
+    @RequiresPermissions(isSave = false)
     public OpResultDTO updateContent(@RequestHeader(name = "token") String token,
                                      @RequestBody QuestionnaireDTO entity) {
         OpResultDTO opResult = new OpResultDTO();
@@ -230,7 +230,7 @@ public class QuestionnaireController {
      * @date 2023/11/23 9:28
      */
     @RequestMapping(value = "/isValid", method = RequestMethod.POST)
-    @RequiresPermissions(isSave = false, apiAuth = {ApiAuth.ADMIN})
+    @RequiresPermissions(isSave = false)
     public OpResultDTO isValid(@RequestHeader(name = "token") String token,
                                HttpServletRequest request) {
         OpResultDTO opResult = new OpResultDTO();
@@ -256,7 +256,7 @@ public class QuestionnaireController {
      * @date 2024/04/22 14:28
      */
     @RequestMapping(value = "/copy", method = RequestMethod.POST)
-    @RequiresPermissions(isSave = false, apiAuth = {ApiAuth.ADMIN})
+    @RequiresPermissions(isSave = false)
     public OpResultDTO copy(@RequestHeader(name = "token") String token,
                             @RequestBody QuestionnaireDTO entity) {
         OpResultDTO opResult = new OpResultDTO();

@@ -82,9 +82,8 @@ public class JWTUtil {
         TokenDTO tokenDTO = new TokenDTO();
         tokenDTO.setAccountId(1L);
         tokenDTO.setRoleId(1);
-        String req = createSign(tokenDTO.toString(), 240);
+        String req = createSign(tokenDTO.toString(), 720000000);
         System.out.println(req);
         System.out.println(JWTUtil.verifyToken(req));
-        System.out.println(System.currentTimeMillis()/1000);
     }
 }
