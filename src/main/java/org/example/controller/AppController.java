@@ -98,7 +98,6 @@ public class AppController {
     public ApiResponse<List<EnrolledActivityVO>> getEnrolledActivityList() {
         try {
             Long userId = tokenService.getUserId();
-
             List<EnrolledActivityVO> enrolledActivities = appUserService.getEnrolledActivityList(userId);
             return ApiResponse.success(enrolledActivities);
         } catch (CommonJsonException e) {

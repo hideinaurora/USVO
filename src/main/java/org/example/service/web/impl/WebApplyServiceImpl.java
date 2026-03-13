@@ -14,6 +14,7 @@ import org.example.entity.activity.apply.ApplyPayEntity;
 import org.example.entity.activity.apply.ApplyUserEntity;
 import org.example.entity.activity.refund.RefundEntity;
 import org.example.entity.basic.user.UserEntity;
+import org.example.service.ApplyLockService;
 import org.example.service.activity.apply.ApplyPayService;
 import org.example.service.activity.apply.ApplyService;
 import org.example.service.activity.apply.ApplyUserService;
@@ -51,6 +52,9 @@ public class WebApplyServiceImpl implements WebApplyService {
 
     @Resource
     private UserService userService;
+
+    @Resource
+    private ApplyLockService applyLockService;
 
     @Override
     public PageResult<ApplyDetailVO> queryPage(ApplyQueryDTO queryDTO) {
@@ -117,6 +121,8 @@ public class WebApplyServiceImpl implements WebApplyService {
         ApplyEntity entity = new ApplyEntity();
         BeanUtils.copyProperties(saveDTO, entity);
         applyService.save(entity);
+        // 添加redis库存
+        applyLockService.setInitialApply(entity.getApplyId(), saveDTO.getLimitNum().longValue());
         return entity.getApplyId();
     }
 
@@ -126,9 +132,10 @@ public class WebApplyServiceImpl implements WebApplyService {
         if (saveDTO.getApplyId() == null) {
             throw new CommonJsonException("活动ID不能为空");
         }
-
         ApplyEntity entity = new ApplyEntity();
         BeanUtils.copyProperties(saveDTO, entity);
+        // 更新不支持修改限制人数
+        entity.setLimitNum(null);
         return applyService.updateById(entity);
     }
 

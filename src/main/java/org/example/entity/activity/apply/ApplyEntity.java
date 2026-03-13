@@ -89,5 +89,11 @@ public class ApplyEntity implements Serializable {
     @TableField(value = "limit_num")
     private Integer limitNum;
 
+  /**
+   * 剩余报名人数
+   */
+    @TableField(value = "remaining_quota")
+    private Integer remainingQuota;
+
 
 }

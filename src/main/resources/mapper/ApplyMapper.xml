@@ -14,11 +14,12 @@
         <result column="is_deleted" property="isDeleted" />
         <result column="active_info" property="activeInfo" />
         <result column="limit_num" property="limitNum" />
+        <result column="remaining_quota" property="remainingQuota" />
     </resultMap>
 
     <!-- 通用查询结果列 -->
     <sql id="Base_Column_List">
-        apply_id, apply_title, apply_start_time, apply_end_time, apply_expense, gmt_create, gmt_modify, is_deleted, active_info, limit_num
+        apply_id, apply_title, apply_start_time, apply_end_time, apply_expense, gmt_create, gmt_modify, is_deleted, active_info, limit_num, remaining_quota
     </sql>
 
 </mapper>
