@@ -1,13 +1,13 @@
 package org.example.aop.aspect;
 
 import lombok.extern.slf4j.Slf4j;
-import org.example.aop.annotation.ApiIdempotent;
-import org.example.config.exception.CommonJsonException;
-import org.example.utils.RedisUtil;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.reflect.MethodSignature;
+import org.example.aop.annotation.ApiIdempotent;
+import org.example.config.exception.CommonJsonException;
+import org.example.utils.RedisUtil;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -63,14 +63,14 @@ public class IdempotentAspect {
         String idempotentKey = IDEMPOTENT_PREFIX + token + ":" + requestURI;
 
         // 5. 检查是否已经处理过该请求
-        Boolean hasKey = redisUtil.hasKey(idempotentKey);
-        if (hasKey != null && hasKey) {
+        boolean hasKey = redisUtil.exists(idempotentKey);
+        if (hasKey) {
             log.warn("重复请求被拦截: token={}, uri={}", token, requestURI);
             throw new CommonJsonException("请勿重复提交，请稍后再试");
         }
 
         // 6. 设置幂等性标识
-        int expireSeconds = idempotent.expireSeconds();
+        long expireSeconds = idempotent.expireSeconds();
         redisUtil.set(idempotentKey, "1", expireSeconds, TimeUnit.SECONDS);
 
         try {
