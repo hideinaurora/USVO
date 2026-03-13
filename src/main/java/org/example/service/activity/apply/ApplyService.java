@@ -8,6 +8,7 @@ import org.example.dto.activity.ApplyUserQueryDTO;
 import org.example.entity.activity.apply.ApplyEntity;
 import org.example.vo.activity.ApplyDetailVO;
 import org.example.vo.activity.ApplyUserDetailVO;
+import org.example.vo.ActivityVO;
 import com.baomidou.mybatisplus.extension.service.IService;
 
 import java.util.List;

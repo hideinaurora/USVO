@@ -25,6 +25,8 @@ import org.example.service.basic.user.UserService;
 import org.example.utils.StringTools;
 import org.example.vo.activity.ApplyDetailVO;
 import org.example.vo.activity.ApplyUserDetailVO;
+import org.example.vo.ActivityVO;
+import org.example.vo.ApplyPayVO;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

@@ -5,22 +5,20 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.extern.slf4j.Slf4j;
 import org.example.common.PageResult;
 import org.example.config.exception.CommonJsonException;
-import org.example.dto.TokenDTO;
 import org.example.dto.activity.RefundExamineDTO;
 import org.example.dto.activity.RefundQueryDTO;
 import org.example.entity.activity.apply.ApplyEntity;
 import org.example.entity.activity.refund.RefundEntity;
 import org.example.entity.activity.refund.RefundExamineEntity;
 import org.example.entity.basic.user.UserEntity;
+import org.example.service.TokenService;
 import org.example.service.activity.apply.ApplyService;
 import org.example.service.activity.refund.RefundExamineService;
 import org.example.service.activity.refund.RefundService;
 import org.example.service.basic.user.UserService;
 import org.example.service.web.WebRefundService;
-import org.example.utils.JWTUtil;
 import org.example.utils.StringTools;
 import org.example.vo.activity.RefundDetailVO;
-import org.slf4j.MDC;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,6 +40,8 @@ public class WebRefundServiceImpl implements WebRefundService {
 
     @Resource
     private RefundExamineService refundExamineService;
+    @Resource
+    private TokenService tokenService;
 
     @Override
     public PageResult<RefundDetailVO> queryPage(RefundQueryDTO queryDTO) {
@@ -239,7 +239,7 @@ public class WebRefundServiceImpl implements WebRefundService {
         }
 
         // 4. 获取当前管理员ID
-        Long adminId = getCurrentAdminId();
+        Long adminId = tokenService.getUserId();
 
         // 5. 更新退款申请的审核状态
         RefundEntity updateEntity = new RefundEntity();
@@ -259,28 +259,6 @@ public class WebRefundServiceImpl implements WebRefundService {
                 examineDTO.getRefundId(), adminId, examineDTO.getExamineType());
 
         return true;
-    }
-
-    /**
-     * 获取当前登录的管理员ID
-     */
-    private Long getCurrentAdminId() {
-        try {
-            String token = MDC.get("token");
-            if (StringTools.isNullOrEmpty(token)) {
-                throw new CommonJsonException("获取登录信息失败");
-            }
-            TokenDTO tokenDTO = JWTUtil.verifyToken(token);
-            if (tokenDTO == null || tokenDTO.getAccountId() == null) {
-                throw new CommonJsonException("获取管理员ID失败");
-            }
-            return tokenDTO.getAccountId();
-        } catch (CommonJsonException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("获取当前管理员ID失败", e);
-            throw new CommonJsonException("获取管理员ID失败");
-        }
     }
 
     /**
