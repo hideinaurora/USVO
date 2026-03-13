@@ -1,9 +1,18 @@
 package org.example.service.sys.admin.impl;
 
 
+import com.alibaba.fastjson2.JSONObject;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import lombok.extern.slf4j.Slf4j;
+import org.example.config.exception.CommonJsonException;
+import org.example.dto.LoginRequestDTO;
 import org.example.entity.sys.admin.AdminEntity;
 import org.example.mapper.sys.admin.AdminMapper;
 import org.example.service.sys.admin.AdminService;
+import org.example.utils.RedisUtil;
+import org.example.utils.StringTools;
+import org.example.vo.CaptchaVO;
+import org.example.vo.LoginResponseVO;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,6 +22,8 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import javax.annotation.Resource;
 import java.util.Date;
 import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 /**
  * <p>
@@ -22,6 +33,102 @@ import java.util.List;
  * @author ckd
  * @since 2026-03-13
  */
+@Slf4j
 @Service
-        public class AdminServiceImpl extends ServiceImpl<AdminMapper, AdminEntity> implements AdminService {
+public class AdminServiceImpl extends ServiceImpl<AdminMapper, AdminEntity> implements AdminService {
+
+    private static final String CAPTCHA_PREFIX = "admin:captcha:";
+    private static final long CAPTCHA_EXPIRE_MINUTES = 5;
+    private static final int TOKEN_EXPIRE_MINUTES = 720;
+
+    @Resource
+    private RedisUtil redisUtil;
+
+    @Override
+    public LoginResponseVO login(LoginRequestDTO loginRequest) {
+        // 1. 参数校验
+        if (StringTools.isNullOrEmpty(loginRequest.getLoginName())) {
+            throw new CommonJsonException("登录名不能为空");
         }
+        if (StringTools.isNullOrEmpty(loginRequest.getLoginPassword())) {
+            throw new CommonJsonException("密码不能为空");
+        }
+        if (StringTools.isNullOrEmpty(loginRequest.getCaptchaKey())) {
+            throw new CommonJsonException("验证码key不能为空");
+        }
+        if (StringTools.isNullOrEmpty(loginRequest.getCaptchaCode())) {
+            throw new CommonJsonException("验证码不能为空");
+        }
+
+        // 2. 验证码校验
+        String captchaKey = CAPTCHA_PREFIX + loginRequest.getCaptchaKey();
+        Object storedCaptcha = redisUtil.get(captchaKey);
+        if (storedCaptcha == null) {
+            throw new CommonJsonException("验证码已过期，请重新获取");
+        }
+        String storedCode = storedCaptcha.toString();
+        if (!storedCode.equalsIgnoreCase(loginRequest.getCaptchaCode())) {
+            throw new CommonJsonException("验证码错误");
+        }
+        // 删除已使用的验证码
+        redisUtil.remove(captchaKey);
+
+        // 3. 查询用户
+        QueryWrapper<AdminEntity> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("login_name", loginRequest.getLoginName());
+        AdminEntity admin = getOne(queryWrapper);
+
+        if (admin == null) {
+            throw new CommonJsonException("用户不存在");
+        }
+
+        // 4. 校验用户状态
+        if (admin.getUserStatus() == null || admin.getUserStatus() != 1) {
+            throw new CommonJsonException("用户已被禁用");
+        }
+
+        // 5. 密码校验
+        String encryptedPassword = DigestUtils.md5DigestAsHex(loginRequest.getLoginPassword().getBytes());
+        if (!encryptedPassword.equals(admin.getLoginPassword())) {
+            throw new CommonJsonException("密码错误");
+        }
+
+        // 6. 生成Token
+        JSONObject tokenData = new JSONObject();
+        tokenData.put("accountId", admin.getId());
+        tokenData.put("roleId", 1); // 默认角色ID，可根据实际业务调整
+        String token = org.example.utils.JWTUtil.createSign(tokenData.toString(), TOKEN_EXPIRE_MINUTES);
+
+        // 7. 构建响应
+        LoginResponseVO response = new LoginResponseVO();
+        response.setAccessToken(token);
+        response.setUserId(admin.getId());
+        response.setLoginName(admin.getLoginName());
+        response.setRoleId(1); // 默认角色ID
+
+        log.info("管理员登录成功: {}", admin.getLoginName());
+        return response;
+    }
+
+    @Override
+    public CaptchaVO generateCaptcha() {
+        // 1. 生成验证码
+        JSONObject captchaData = org.example.utils.CaptchaUtil.generateCaptcha();
+        String code = captchaData.getString("code");
+        String image = captchaData.getString("image");
+
+        // 2. 生成验证码key
+        String captchaKey = UUID.randomUUID().toString();
+
+        // 3. 存储到Redis，5分钟过期
+        String redisKey = CAPTCHA_PREFIX + captchaKey;
+        redisUtil.set(redisKey, code, CAPTCHA_EXPIRE_MINUTES, TimeUnit.MINUTES);
+
+        // 4. 构建响应
+        CaptchaVO captchaVO = new CaptchaVO();
+        captchaVO.setCaptchaKey(captchaKey);
+        captchaVO.setCaptchaImage(image);
+
+        return captchaVO;
+    }
+}

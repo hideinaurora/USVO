@@ -12,10 +12,6 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface RequiresPermissions {
 
-    boolean isSave() default true;
-
-    boolean checkAuth() default true;
-
     String value() default "";
 
     ApiAuth[] apiAuth() default {ApiAuth.ADMIN, ApiAuth.USER};
