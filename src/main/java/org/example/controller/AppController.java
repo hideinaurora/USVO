@@ -16,6 +16,7 @@ import org.example.service.app.AppUserService;
 import org.example.service.basic.user.UserService;
 import org.example.vo.ActivityVO;
 import org.example.vo.AppLoginResponseVO;
+import org.example.vo.EnrolledActivityVO;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
@@ -35,7 +36,6 @@ public class AppController {
 
     @Resource
     private UserService userService;
-
     @Resource
     private AppUserService appUserService;
     @Resource
@@ -86,6 +86,26 @@ public class AppController {
         } catch (Exception e) {
             log.error("查询活动列表失败", e);
             throw new CommonJsonException("查询活动列表失败，请稍后重试");
+        }
+    }
+
+    @Operation(summary = "查询已报名活动列表", description = "查询用户已报名的活动，包含支付订单信息和退款记录（含审核记录）",
+            parameters = {
+                    @Parameter(name = "token", description = "JWT访问令牌", required = true, in = ParameterIn.HEADER)
+            })
+    @GetMapping("/enrolled-activities")
+    @RequiresPermissions(value = "app:enrolled:query", apiAuth = {ApiAuth.USER})
+    public ApiResponse<List<EnrolledActivityVO>> getEnrolledActivityList() {
+        try {
+            Long userId = tokenService.getUserId();
+
+            List<EnrolledActivityVO> enrolledActivities = appUserService.getEnrolledActivityList(userId);
+            return ApiResponse.success(enrolledActivities);
+        } catch (CommonJsonException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("查询已报名活动列表失败", e);
+            throw new CommonJsonException("查询已报名活动列表失败，请稍后重试");
         }
     }
 }
