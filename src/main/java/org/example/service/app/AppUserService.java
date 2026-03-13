@@ -1,9 +1,11 @@
 package org.example.service.app;
 
 import org.example.dto.ApplyRequestDTO;
+import org.example.dto.RefundRequestDTO;
 import org.example.vo.ActivityVO;
 import org.example.vo.ApplyResponseVO;
 import org.example.vo.EnrolledActivityVO;
+import org.example.vo.RefundResponseVO;
 
 import java.util.List;
 
@@ -32,4 +34,15 @@ public interface AppUserService {
      * @return 报名响应，包含支付订单信息
      */
     ApplyResponseVO applyActivity(Long userId, ApplyRequestDTO request);
+
+    /**
+     * 用户申请退款
+     * 支持审核拒绝后重新发起
+     * 一个订单只存在一条申请退款的记录
+     *
+     * @param userId 用户ID
+     * @param request 退款请求
+     * @return 退款申请响应
+     */
+    RefundResponseVO applyRefund(Long userId, RefundRequestDTO request);
 }

@@ -12,6 +12,7 @@ import org.example.config.exception.CommonJsonException;
 import org.example.dto.AppLoginRequestDTO;
 import org.example.dto.AppRegisterRequestDTO;
 import org.example.dto.ApplyRequestDTO;
+import org.example.dto.RefundRequestDTO;
 import org.example.service.TokenService;
 import org.example.service.app.AppUserService;
 import org.example.service.basic.user.UserService;
@@ -19,6 +20,7 @@ import org.example.vo.ActivityVO;
 import org.example.vo.AppLoginResponseVO;
 import org.example.vo.ApplyResponseVO;
 import org.example.vo.EnrolledActivityVO;
+import org.example.vo.RefundResponseVO;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
@@ -126,6 +128,25 @@ public class AppController {
         } catch (Exception e) {
             log.error("报名活动失败", e);
             throw new CommonJsonException("报名活动失败，请稍后重试");
+        }
+    }
+
+    @Operation(summary = "申请退款", description = "用户申请退款，支持审核拒绝后重新发起。一个订单只存在一条申请退款的记录",
+            parameters = {
+                    @Parameter(name = "token", description = "JWT访问令牌", required = true, in = ParameterIn.HEADER)
+            })
+    @PostMapping("/refund/apply")
+    @RequiresPermissions(value = "app:refund:create", apiAuth = {ApiAuth.USER})
+    public ApiResponse<RefundResponseVO> applyRefund(@Valid @RequestBody RefundRequestDTO request) {
+        try {
+            Long userId = tokenService.getUserId();
+            RefundResponseVO response = appUserService.applyRefund(userId, request);
+            return ApiResponse.success(response);
+        } catch (CommonJsonException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("申请退款失败", e);
+            throw new CommonJsonException("申请退款失败，请稍后重试");
         }
     }
 }

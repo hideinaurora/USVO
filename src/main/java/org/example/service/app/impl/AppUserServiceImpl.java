@@ -1,9 +1,11 @@
 package org.example.service.app.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import lombok.extern.slf4j.Slf4j;
 import org.example.config.exception.CommonJsonException;
 import org.example.dto.ApplyRequestDTO;
+import org.example.dto.RefundRequestDTO;
 import org.example.entity.activity.apply.ApplyEntity;
 import org.example.entity.activity.apply.ApplyPayEntity;
 import org.example.entity.activity.apply.ApplyUserEntity;
@@ -425,6 +427,113 @@ public class AppUserServiceImpl implements AppUserService {
             redisUtil.remove(idempotentKey);
             throw e;
         }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public RefundResponseVO applyRefund(Long userId, RefundRequestDTO request) {
+        // 2. 查询报名记录
+        ApplyPayEntity pay = applyPayService.getOne(
+                Wrappers.<ApplyPayEntity>lambdaQuery()
+                        .eq(ApplyPayEntity::getMerOrderId, request.getMerOrderId())
+        );
+        if (pay == null) {
+            throw new CommonJsonException("支付记录不存在");
+        }
+
+        // 3. 验证报名记录是否属于当前用户
+        if (!pay.getUserId().equals(userId)) {
+            throw new CommonJsonException("无权操作该报名记录");
+        }
+
+        // 4. 检查是否已支付
+        if (pay.getPayStatus() != 1) {
+            throw new CommonJsonException("未支付的订单不能申请退款");
+        }
+
+        // 5. 查询该订单是否已有退款记录
+        QueryWrapper<RefundEntity> refundWrapper = new QueryWrapper<>();
+        refundWrapper.eq("user_id", userId);
+        refundWrapper.eq("mer_order_id", pay.getMerOrderId());
+        refundWrapper.orderByDesc("gmt_create");
+        refundWrapper.last("LIMIT 1");
+        RefundEntity existRefund = refundService.getOne(refundWrapper);
+
+        // 6. 判断是否可以申请退款
+        if (existRefund != null) {
+            if (existRefund.getExamineType() == 0) {
+                throw new CommonJsonException("退款申请审核中，请勿重复提交");
+            } else if (existRefund.getExamineType() == 1) {
+                throw new CommonJsonException("该订单已退款成功，无法再次申请");
+            } else if (existRefund.getExamineType() == 2) {
+                // 审核拒绝，可以重新申请
+                log.info("重新申请退款：refundId={}, enrollRecordId={}", existRefund.getId(), request.getMerOrderId());
+            }
+        }
+
+        // 7. 创建或更新退款申请
+        RefundEntity refund;
+        boolean isReapply = false;
+
+        if (existRefund != null && existRefund.getExamineType() == 2) {
+            // 审核拒绝，重新申请：更新原记录
+            refund = existRefund;
+            refund.setExamineType(0); // 重新设置为待审核
+            refund.setRefundNo(generateRefundNo());
+            refund.setBz(request.getReason()); // 更新退款原因
+            refund.setRefundTime(null);
+            refund.setRefundTotalTime(null);
+            refund.setOutRefundNo(null);
+            refund.setFailMessage(null);
+            isReapply = true;
+
+            refundService.updateById(refund);
+
+            // 删除旧的审核记录
+            QueryWrapper<RefundExamineEntity> examineWrapper = new QueryWrapper<>();
+            examineWrapper.eq("refund_id", refund.getId());
+            refundExamineService.remove(examineWrapper);
+
+            log.info("更新退款申请记录：refundId={}", refund.getId());
+
+        } else {
+            // 首次申请退款
+            refund = new RefundEntity();
+            refund.setUserId(userId);
+            refund.setApplyId(pay.getApplyId());
+            refund.setApplyStudentId(pay.getApplyStudentId());
+            refund.setMerOrderId(pay.getMerOrderId());
+            refund.setExamineType(0); // 待审核
+            refund.setRefundNo(generateRefundNo());
+            refund.setRefundAmount(pay.getTotalAmount());
+            refund.setTotalAmount(pay.getTotalAmount());
+            refund.setBz(request.getReason());
+
+            refundService.save(refund);
+
+            log.info("创建退款申请记录：refundId={}, enrollRecordId={}, amount={}",
+                    refund.getId(), pay.getMerOrderId(), pay.getTotalAmount());
+        }
+
+        // 8. 构建响应
+        RefundResponseVO response = new RefundResponseVO();
+        response.setRefundId(refund.getId());
+        response.setRefundNo(refund.getRefundNo());
+        response.setExamineType(0); // 待审核
+        response.setIsReapply(isReapply);
+
+        log.info("用户申请退款成功：userId={}, refundId={}, isReapply={}",
+                userId, refund.getId(), isReapply);
+
+        return response;
+    }
+
+    /**
+     * 生成退款单号
+     */
+    private String generateRefundNo() {
+        return "REF" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")) +
+                StringTools.generateRandomAlphanumericString(6);
     }
 
     /**
