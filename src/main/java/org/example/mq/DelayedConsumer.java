@@ -125,21 +125,15 @@ public class DelayedConsumer {
     private void handleOrderTimeoutWithRetry(String message, int retryCount) {
         log.info("【业务处理】执行订单超时取消逻辑: {},重试次数：{}", message, retryCount);
         try {
-            JSONObject body = JSONObject.parseObject(message);
-            if (!body.containsKey("merOrderId")) {
-                log.error("【订单取消】订单号不存在");
-                return;
-            }
-            String merOrderId = body.getString("merOrderId");
             ApplyPayEntity pay = applyPayService.getOne(
                     Wrappers.<ApplyPayEntity>lambdaQuery()
-                            .eq(ApplyPayEntity::getMerOrderId, merOrderId)
+                            .eq(ApplyPayEntity::getMerOrderId, message)
             );
             if (pay == null) {
                 log.error("【订单取消】订单号不存在");
                 return;
             }
-            log.info("【订单取消】✅ 订单超时取消成功:{}", merOrderId);
+            log.info("【订单取消】✅ 订单超时取消成功:{}", message);
         } catch (Exception e) {
             // 1.重新推送到延迟队列，再次取消订单
             // 2.记录错误日志人工干预

@@ -53,33 +53,6 @@ public class DelayedProducer {
     }
 
     /**
-     * 发送延迟对象消息（持久化）
-     *
-     * @param object      消息对象
-     * @param delayMillis 延迟时间（毫秒）
-     */
-    public void sendDelayedObjectMessage(Object object, long delayMillis) {
-        String messageId = UUID.randomUUID().toString();
-
-        log.info("【延迟队列】发送持久化延迟对象消息 - ID: {}, 对象: {}, 延迟: {}ms",
-                messageId, object, delayMillis);
-
-        rabbitTemplate.convertAndSend(
-                RabbitMQConfig.DELAYED_EXCHANGE,
-                RabbitMQConfig.DELAYED_ROUTING_KEY,
-                object,
-                msg -> {
-                    msg.getMessageProperties().setMessageId(messageId);
-                    msg.getMessageProperties().setDeliveryMode(MessageDeliveryMode.PERSISTENT);
-                    msg.getMessageProperties().setDelay((int) delayMillis);
-                    return msg;
-                }
-        );
-
-        log.info("【延迟队列】✅ 持久化对象延迟消息将在 {} 毫秒后被消费", delayMillis);
-    }
-
-    /**
      * 发送订单超时取消示例（持久化）
      *
      * @param orderId    订单ID
@@ -93,26 +66,5 @@ public class DelayedProducer {
                 orderId, delayMinutes);
 
         sendDelayedMessage(message, delayMillis);
-    }
-
-    /**
-     * 演示多个不同延迟时间的消息（持久化）
-     */
-    public void sendMultipleDelayedMessages() {
-        log.info("【延迟队列】演示：发送多条不同延迟时间的持久化消息");
-
-        // 立即执行
-        sendDelayedMessage("立即执行的任务", 0);
-
-        // 5秒后执行
-        sendDelayedMessage("5秒后执行的任务", 5000);
-
-        // 10秒后执行
-        sendDelayedMessage("10秒后执行的任务", 10000);
-
-        // 30秒后执行
-        sendDelayedMessage("30秒后执行的任务", 30000);
-
-        log.info("【延迟队列】✅ 所有持久化延迟消息已发送，将按延迟时间依次到达");
     }
 }
