@@ -37,6 +37,8 @@ spring:
     config:
       delayed-queue: delayed.queue
       delayed-dlq: delayed.queue.dlq
+      normal-queue: normal.queue
+      normal-dlq: normal.queue.dlq
   mvc:
     pathmatch:
       matching-strategy: ant_path_matcher

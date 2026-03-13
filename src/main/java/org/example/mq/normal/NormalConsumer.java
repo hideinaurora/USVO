@@ -1,8 +1,11 @@
 package org.example.mq.normal;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.Channel;
 import lombok.extern.slf4j.Slf4j;
+import org.example.dto.PaymentCallbackDTO;
 import org.example.entity.failed.delayed.DelayedMessageEntity;
+import org.example.service.PaymentCallbackService;
 import org.example.service.failed.delayed.DelayedMessageService;
 import org.redisson.api.RBucket;
 import org.redisson.api.RedissonClient;
@@ -18,7 +21,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * 普通队列消费者
- * 演示基本的消息消费、手动确认、消息重试、死信队列
+ * 处理支付回调消息、基本的消息消费、手动确认、消息重试、死信队列
  *
  * @author RabbitMQ Demo
  * @version 2.0.0
@@ -28,9 +31,16 @@ import java.util.concurrent.TimeUnit;
 public class NormalConsumer {
 
     @Resource
+    private PaymentCallbackService paymentCallbackService;
+
+    @Resource
     private DelayedMessageService delayedMessageService;
+
     @Resource
     private RedissonClient redissonClient;
+
+    @Resource
+    private ObjectMapper objectMapper;
 
     private static final String RETRY_COUNT_PREFIX = "mq:retry:normal:";
     private static final int MAX_RETRY_COUNT = 3;
@@ -79,8 +89,8 @@ public class NormalConsumer {
                 return;
             }
 
-            // 模拟业务处理（带重试）
-            processMessageWithRetry(messageBody, retryCount, messageId);
+            // 处理支付回调消息
+            processPaymentCallbackMessage(messageBody, retryCount, messageId);
 
             // 处理成功，确认消息
             channel.basicAck(deliveryTag, false);
@@ -109,16 +119,35 @@ public class NormalConsumer {
     }
 
     /**
-     * 带重试的业务处理逻辑
+     * 处理支付回调消息
      *
-     * @param messageBody 消息内容
+     * @param messageBody 消息内容（JSON格式的PaymentCallbackDTO）
      * @param retryCount 当前重试次数
      * @param messageId 消息ID
      */
-    private void processMessageWithRetry(String messageBody, int retryCount, String messageId) {
-        log.info("【业务处理】开始处理消息，当前是第 {} 次尝试", retryCount + 1);
+    private void processPaymentCallbackMessage(String messageBody, int retryCount, String messageId) {
+        log.info("【支付回调处理】开始处理支付回调消息，当前是第 {} 次尝试", retryCount + 1);
 
-        log.info("【业务处理】✅ 处理成功，消息内容: {}", messageBody);
+        try {
+            // 解析JSON消息为PaymentCallbackDTO对象
+            PaymentCallbackDTO callbackDTO = objectMapper.readValue(messageBody, PaymentCallbackDTO.class);
+
+            log.info("【支付回调处理】解析成功：商户订单号={}, 交易状态={}",
+                    callbackDTO.getOutTradeNo(), callbackDTO.getTradeStatus());
+
+            // 调用支付回调服务处理
+            String result = paymentCallbackService.handlePaymentCallback(callbackDTO);
+
+            if ("success".equals(result)) {
+                log.info("【支付回调处理】✅ 处理成功，订单号={}", callbackDTO.getOutTradeNo());
+            } else {
+                throw new RuntimeException("支付回调处理失败：" + result);
+            }
+
+        } catch (Exception e) {
+            log.error("【支付回调处理】❌ 处理失败，消息内容: {}", messageBody, e);
+            throw new RuntimeException("支付回调处理失败", e);
+        }
     }
 
     /**
