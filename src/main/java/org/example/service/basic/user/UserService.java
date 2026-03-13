@@ -34,4 +34,12 @@ public interface UserService extends IService<UserEntity> {
      * @return 登录响应信息
      */
     AppLoginResponseVO login(AppLoginRequestDTO loginRequest);
+
+    /**
+     * 微信小程序登录
+     *
+     * @param wxId 微信openId
+     * @return 登录响应信息（包含token）
+     */
+    AppLoginResponseVO wxLogin(String wxId);
 }

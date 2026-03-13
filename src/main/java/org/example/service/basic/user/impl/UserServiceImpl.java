@@ -144,4 +144,43 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
         log.info("移动端用户登录成功: {}", user.getLoginName());
         return response;
     }
+
+    @Override
+    public AppLoginResponseVO wxLogin(String wxId) {
+        // 1. 参数校验
+        if (StringTools.isNullOrEmpty(wxId)) {
+            throw new CommonJsonException("微信openId不能为空");
+        }
+
+        // 2. 通过微信openId查询用户
+        QueryWrapper<UserEntity> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("wx_id", wxId);
+        UserEntity user = getOne(queryWrapper);
+
+        if (user == null) {
+            throw new CommonJsonException("用户不存在，请先注册");
+        }
+
+        // 3. 校验用户状态
+        if (user.getUserStatus() == null || user.getUserStatus() != 1) {
+            throw new CommonJsonException("用户已被禁用");
+        }
+
+        // 4. 生成Token
+        JSONObject tokenData = new JSONObject();
+        tokenData.put("accountId", user.getId());
+        tokenData.put("roleId", 2); // 移动端用户角色ID
+        String token = org.example.utils.JWTUtil.createSign(tokenData.toString(), TOKEN_EXPIRE_MINUTES);
+
+        // 5. 构建响应
+        AppLoginResponseVO response = new AppLoginResponseVO();
+        response.setAccessToken(token);
+        response.setUserId(user.getId());
+        response.setLoginName(user.getLoginName());
+        response.setUserName(user.getUserName());
+        response.setRoleId(2); // 移动端用户角色ID
+
+        log.info("微信小程序登录成功: userId={}, wxId={}", user.getId(), wxId);
+        return response;
+    }
 }
