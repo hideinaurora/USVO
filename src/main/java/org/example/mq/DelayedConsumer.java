@@ -1,11 +1,12 @@
 package org.example.mq;
 
-import com.alibaba.fastjson2.JSONObject;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.rabbitmq.client.Channel;
 import lombok.extern.slf4j.Slf4j;
 import org.example.entity.activity.apply.ApplyPayEntity;
+import org.example.entity.failed.delayed.DelayedMessageEntity;
 import org.example.service.activity.apply.ApplyPayService;
+import org.example.service.failed.delayed.DelayedMessageService;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
@@ -35,6 +36,8 @@ public class DelayedConsumer {
     private static final int MAX_RETRY_COUNT = 3;
     @Resource
     private ApplyPayService applyPayService;
+    @Resource
+    private DelayedMessageService delayedMessageService;
 
     /**
      * 监听延迟队列
@@ -207,14 +210,11 @@ public class DelayedConsumer {
         // 实际应用中，应该保存到数据库或发送告警
         log.warn("【延迟死信处理】保存失败消息 - ID: {}, 内容: {}", messageId, messageBody);
 
-        // 示例：保存到数据库
-        // FailedDelayedMessage failedMessage = new FailedDelayedMessage();
-        // failedMessage.setMessageId(messageId);
-        // failedMessage.setContent(messageBody);
-        // failedMessage.setFailedTime(new Date());
-        // failedMessageRepository.save(failedMessage);
+        DelayedMessageEntity failedMessage = new DelayedMessageEntity();
+        failedMessage.setMessageId(messageId);
+        failedMessage.setContent(messageBody);
+        failedMessage.setFailedTime(LocalDateTime.now());
+        delayedMessageService.save(failedMessage);
 
-        // 示例：发送紧急告警
-        // alertService.sendUrgentAlert("延迟消息处理失败", messageId);
     }
 }
