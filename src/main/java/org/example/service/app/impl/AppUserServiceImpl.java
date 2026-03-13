@@ -9,7 +9,7 @@ import org.example.entity.activity.apply.ApplyPayEntity;
 import org.example.entity.activity.apply.ApplyUserEntity;
 import org.example.entity.activity.refund.RefundEntity;
 import org.example.entity.activity.refund.RefundExamineEntity;
-import org.example.mq.DelayedProducer;
+import org.example.mq.delayed.DelayedProducer;
 import org.example.service.ApplyLockService;
 import org.example.service.activity.apply.ApplyPayService;
 import org.example.service.activity.apply.ApplyService;

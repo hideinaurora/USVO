@@ -1,6 +1,7 @@
-package org.example.mq;
+package org.example.mq.delayed;
 
 import lombok.extern.slf4j.Slf4j;
+import org.example.mq.RabbitMQConfig;
 import org.springframework.amqp.core.MessageDeliveryMode;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;

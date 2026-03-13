@@ -1,4 +1,4 @@
-package org.example.mq;
+package org.example.mq.delayed;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.rabbitmq.client.Channel;
