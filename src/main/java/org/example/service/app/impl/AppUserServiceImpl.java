@@ -26,11 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 import javax.annotation.Resource;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -359,7 +355,7 @@ public class AppUserServiceImpl implements AppUserService {
             payOrder.setPayStatus(0); // 未支付
 
             // 生成商户订单号
-            String merOrderId = generateMerOrderId(userId, request.getApplyId());
+            String merOrderId = generateMerOrderId();
             payOrder.setMerOrderId(merOrderId);
 
             // 设置订单描述
@@ -417,9 +413,7 @@ public class AppUserServiceImpl implements AppUserService {
     /**
      * 生成商户订单号
      */
-    private String generateMerOrderId(Long userId, Long applyId) {
-        long timestamp = System.currentTimeMillis();
-        int random = (int) (Math.random() * 10000);
-        return String.format("MER%d%d%04d", userId, timestamp, random);
+    private String generateMerOrderId() {
+        return String.format("MER" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")) + StringTools.generateRandomAlphanumericString(6));
     }
 }

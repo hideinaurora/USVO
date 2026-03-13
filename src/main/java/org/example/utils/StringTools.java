@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.toolkit.StringUtils;
 import org.example.dto.OpResultDTO;
 
 import java.math.BigDecimal;
+import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -21,6 +22,18 @@ public class StringTools {
 
     public static boolean isNullOrEmpty(Object obj) {
         return null == obj || "".equals(obj) || "null".equals(obj);
+    }
+
+    private static final String CHARSET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    private static final Random RANDOM = new Random();
+
+
+
+    public static String generateRandomAlphanumericString(int length) {
+        return RANDOM.ints(length, 0, CHARSET.length())
+                .mapToObj(CHARSET::charAt)
+                .collect(StringBuilder::new, StringBuilder::append, StringBuilder::append)
+                .toString();
     }
 
     /**
