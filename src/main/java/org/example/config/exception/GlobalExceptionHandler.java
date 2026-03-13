@@ -1,7 +1,7 @@
 package org.example.config.exception;
 
+import org.example.common.ApiResponse;
 import org.example.dto.OpResultDTO;
-import org.example.utils.StringTools;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.validation.BindException;
@@ -27,9 +27,9 @@ public class GlobalExceptionHandler {
     private final Logger logger = LoggerFactory.getLogger(this.getClass().getName());
 
     @ExceptionHandler(value = Exception.class)
-    public OpResultDTO defaultErrorHandler(HttpServletRequest req, Exception e) {
+    public ApiResponse<?> defaultErrorHandler(HttpServletRequest req, Exception e) {
         logger.error("异常", e);
-        return StringTools.getErrorReturn("服务器异常，请稍后重试");
+        return ApiResponse.error(500, "服务器异常，请稍后重试");
     }
 
     /**
@@ -38,8 +38,8 @@ public class GlobalExceptionHandler {
      * 所以定义了这个拦截器
      */
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
-    public OpResultDTO httpRequestMethodHandler() {
-        return StringTools.getErrorReturn("请求方式不符");
+    public ApiResponse<?> httpRequestMethodHandler() {
+        return ApiResponse.error(405, "请求方式不符");
     }
 
     /**
@@ -48,16 +48,18 @@ public class GlobalExceptionHandler {
      * 常见使用场景是参数校验失败,抛出此错,返回错误信息给前端
      */
     @ExceptionHandler(org.example.config.exception.CommonJsonException.class)
-    public OpResultDTO commonJsonExceptionHandler(org.example.config.exception.CommonJsonException commonJsonException) {
-        return commonJsonException.getResultJson();
+    public ApiResponse<?> commonJsonExceptionHandler(org.example.config.exception.CommonJsonException commonJsonException) {
+        OpResultDTO resultJson = commonJsonException.getResultJson();
+        String message = resultJson.getObjResult() != null ? resultJson.getObjResult().toString() : "操作失败";
+        return ApiResponse.error(Integer.parseInt(resultJson.getLongResult().toString()), message);
     }
 
     /**
      * 权限不足报错拦截
      */
     @ExceptionHandler(org.example.config.exception.UnauthorizedException.class)
-    public OpResultDTO unauthorizedExceptionHandler() {
-        return StringTools.getErrorReturn("权限不符");
+    public ApiResponse<?> unauthorizedExceptionHandler() {
+        return ApiResponse.error(403, "权限不符");
     }
 
     /**
@@ -65,15 +67,15 @@ public class GlobalExceptionHandler {
      * 在请求需要权限的接口,而连登录都还没登录的时候,会报此错
      */
     @ExceptionHandler(org.example.config.exception.UnauthenticatedException.class)
-    public OpResultDTO unauthenticatedException() {
-        return StringTools.getErrorReturn("登录失效请重新登录");
+    public ApiResponse<?> unauthenticatedException() {
+        return ApiResponse.error(401, "登录失效请重新登录");
     }
 
     /**
      * 数据校验
      */
     @ExceptionHandler({MethodArgumentNotValidException.class, BindException.class})
-    public OpResultDTO methodArgumentNotValidExceptionHandler(MethodArgumentNotValidException e) {
+    public ApiResponse<?> methodArgumentNotValidExceptionHandler(MethodArgumentNotValidException e) {
         Map<String, String> error = new HashMap<>();
         List<ObjectError> allErrors = e.getBindingResult().getAllErrors();
         allErrors.forEach(er -> {
@@ -81,6 +83,6 @@ public class GlobalExceptionHandler {
             String message = er.getDefaultMessage();
             error.put(fieldName, message);
         });
-        return StringTools.getErrorReturn(error);
+        return ApiResponse.error(error.toString());
     }
 }
