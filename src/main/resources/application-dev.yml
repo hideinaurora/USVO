@@ -2,6 +2,41 @@ server:
   port: 9013
 
 spring:
+  # RabbitMQ配置
+  rabbitmq:
+    host: 192.168.10.141
+    port: 5672
+    username: admin
+    password: ibdw@123
+    # 虚拟主机（默认为/）
+    virtual-host: /
+
+    # 消息确认配置
+    publisher-confirm-type: correlated  # 发布确认模式
+    publisher-returns: true             # 消息返回
+    template:
+      mandatory: true                   # 消息无法路由时返回给发送者
+
+    # 消费者配置
+    listener:
+      simple:
+        acknowledge-mode: manual        # 手动确认模式
+        prefetch: 1                     # 预取数量，实现公平分发
+        concurrency: 3                  # 消费者并发数量
+        max-concurrency: 10             # 最大消费者并发数量
+        default-requeue-rejected: false # 拒绝的消息不重新入队（进入死信队列）
+
+        # 重试配置
+        retry:
+          enabled: true                 # 启用重试机制
+          max-attempts: 3               # 最大重试次数
+          initial-interval: 2000        # 初始重试间隔（毫秒）
+          multiplier: 2.0               # 重试间隔倍数
+          max-interval: 10000           # 最大重试间隔（毫秒）
+          stateless: true               # 无状态重试
+    config:
+      delayed-queue: delayed.queue
+      delayed-dlq: delayed.queue.dlq
   mvc:
     pathmatch:
       matching-strategy: ant_path_matcher
@@ -34,6 +69,7 @@ spring:
     asyncInit: true
     filters: stat,wall,log4j
     connectionProperties: druid.stat.mergeSql=true
+
 
 logging:
   level:
