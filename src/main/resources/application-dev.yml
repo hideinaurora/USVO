@@ -14,9 +14,9 @@ spring:
       max-request-size: 5MB
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://bigdatacenter.mysql.rds.aliyuncs.com:3306/tmed_db?allowPublicKeyRetrieval=true&allowMultiQueries=true&useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai
-    username: tmeduser
-    password: tmeduser@1234
+    url: jdbc:mysql://192.168.10.141:33068/nblg_apply?allowPublicKeyRetrieval=true&allowMultiQueries=true&useUnicode=true&characterEncoding=UTF-8&useSSL=false
+    username: root
+    password: ibdw@1608
     maxActive: 4
     initialSize: 1
     maxWait: 60000

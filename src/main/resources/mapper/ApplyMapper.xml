@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.example.mapper.activity.apply.ApplyMapper">
+
+    <!-- 通用查询映射结果 -->
+    <resultMap id="BaseResultMap" type="org.example.entity.activity.apply.ApplyEntity">
+        <id column="apply_id" property="applyId" />
+        <result column="apply_title" property="applyTitle" />
+        <result column="apply_start_time" property="applyStartTime" />
+        <result column="apply_end_time" property="applyEndTime" />
+        <result column="apply_expense" property="applyExpense" />
+        <result column="gmt_create" property="gmtCreate" />
+        <result column="gmt_modify" property="gmtModify" />
+        <result column="is_deleted" property="isDeleted" />
+        <result column="active_info" property="activeInfo" />
+        <result column="limit_num" property="limitNum" />
+    </resultMap>
+
+    <!-- 通用查询结果列 -->
+    <sql id="Base_Column_List">
+        apply_id, apply_title, apply_start_time, apply_end_time, apply_expense, gmt_create, gmt_modify, is_deleted, active_info, limit_num
+    </sql>
+
+</mapper>

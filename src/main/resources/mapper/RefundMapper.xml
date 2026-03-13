@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.example.mapper.activity.refund.RefundMapper">
+
+    <!-- 通用查询映射结果 -->
+    <resultMap id="BaseResultMap" type="org.example.entity.activity.refund.RefundEntity">
+        <id column="id" property="id" />
+        <result column="user_id" property="userId" />
+        <result column="mer_order_id" property="merOrderId" />
+        <result column="examine_type" property="examineType" />
+        <result column="gmt_create" property="gmtCreate" />
+        <result column="gmt_modify" property="gmtModify" />
+        <result column="is_deleted" property="isDeleted" />
+        <result column="apply_id" property="applyId" />
+        <result column="apply_student_id" property="applyStudentId" />
+        <result column="refund_no" property="refundNo" />
+        <result column="refund_time" property="refundTime" />
+        <result column="refund_amount" property="refundAmount" />
+        <result column="refund_total_time" property="refundTotalTime" />
+        <result column="out_refund_no" property="outRefundNo" />
+        <result column="bz" property="bz" />
+        <result column="total_amount" property="totalAmount" />
+        <result column="fail_message" property="failMessage" />
+    </resultMap>
+
+    <!-- 通用查询结果列 -->
+    <sql id="Base_Column_List">
+        id, user_id, mer_order_id, examine_type, gmt_create, gmt_modify, is_deleted, apply_id, apply_student_id, refund_no, refund_time, refund_amount, refund_total_time, out_refund_no, bz, total_amount, fail_message
+    </sql>
+
+</mapper>

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.example.mapper.activity.refund.RefundExamineMapper">
+
+    <!-- 通用查询映射结果 -->
+    <resultMap id="BaseResultMap" type="org.example.entity.activity.refund.RefundExamineEntity">
+        <id column="id" property="id" />
+        <result column="refund_id" property="refundId" />
+        <result column="examine_type" property="examineType" />
+        <result column="gmt_create" property="gmtCreate" />
+        <result column="gmt_modify" property="gmtModify" />
+        <result column="is_deleted" property="isDeleted" />
+        <result column="reason" property="reason" />
+        <result column="admin_id" property="adminId" />
+    </resultMap>
+
+    <!-- 通用查询结果列 -->
+    <sql id="Base_Column_List">
+        id, refund_id, examine_type, gmt_create, gmt_modify, is_deleted, reason, admin_id
+    </sql>
+
+</mapper>

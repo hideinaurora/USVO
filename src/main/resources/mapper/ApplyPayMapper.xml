@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.example.mapper.activity.apply.ApplyPayMapper">
+
+    <!-- 通用查询映射结果 -->
+    <resultMap id="BaseResultMap" type="org.example.entity.activity.apply.ApplyPayEntity">
+        <id column="id" property="id" />
+        <result column="user_id" property="userId" />
+        <result column="pay_status" property="payStatus" />
+        <result column="mer_order_id" property="merOrderId" />
+        <result column="order_desc" property="orderDesc" />
+        <result column="expire_time" property="expireTime" />
+        <result column="original_amount" property="originalAmount" />
+        <result column="total_amount" property="totalAmount" />
+        <result column="mer_name" property="merName" />
+        <result column="seq_id" property="seqId" />
+        <result column="pay_time" property="payTime" />
+        <result column="gmt_create" property="gmtCreate" />
+        <result column="gmt_modify" property="gmtModify" />
+        <result column="is_deleted" property="isDeleted" />
+        <result column="apply_id" property="applyId" />
+        <result column="apply_student_id" property="applyStudentId" />
+        <result column="pay_info" property="payInfo" />
+    </resultMap>
+
+    <!-- 通用查询结果列 -->
+    <sql id="Base_Column_List">
+        id, user_id, pay_status, mer_order_id, order_desc, expire_time, original_amount, total_amount, mer_name, seq_id, pay_time, gmt_create, gmt_modify, is_deleted, apply_id, apply_student_id, pay_info
+    </sql>
+
+</mapper>

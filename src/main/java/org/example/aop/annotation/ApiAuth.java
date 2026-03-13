@@ -7,7 +7,8 @@ import lombok.Getter;
 @Getter
 public enum ApiAuth {
     /**
-     * 管理端1市级2学校4区县5机构6乡镇7银联
+     * 管理员：1
+     * 普通用户：2
      */
     ADMIN(1),
     USER(2);
