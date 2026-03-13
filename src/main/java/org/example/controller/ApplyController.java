@@ -13,14 +13,13 @@ import org.example.config.exception.CommonJsonException;
 import org.example.dto.activity.ApplyQueryDTO;
 import org.example.dto.activity.ApplySaveDTO;
 import org.example.dto.activity.ApplyUserQueryDTO;
-import org.example.service.activity.apply.ApplyService;
+import org.example.service.web.WebApplyService;
 import org.example.vo.activity.ApplyDetailVO;
 import org.example.vo.activity.ApplyUserDetailVO;
 import org.springframework.web.bind.annotation.*;
 
-import javax.validation.Valid;
-
 import javax.annotation.Resource;
+import javax.validation.Valid;
 import java.util.List;
 
 /**
@@ -36,7 +35,7 @@ import java.util.List;
 public class ApplyController {
 
     @Resource
-    private ApplyService applyService;
+    private WebApplyService applyService;
 
     @Operation(summary = "分页查询活动列表", description = "分页查询活动，包含报名人数、支付金额、退款人数等统计信息",
             parameters = {

@@ -13,6 +13,7 @@ import org.example.config.exception.CommonJsonException;
 import org.example.dto.activity.RefundExamineDTO;
 import org.example.dto.activity.RefundQueryDTO;
 import org.example.service.activity.refund.RefundService;
+import org.example.service.web.WebRefundService;
 import org.example.vo.activity.RefundDetailVO;
 import org.springframework.web.bind.annotation.*;
 
@@ -34,7 +35,7 @@ import java.util.List;
 public class RefundController {
 
     @Resource
-    private RefundService refundService;
+    private WebRefundService refundService;
 
     @Operation(summary = "分页查询退款学生列表", description = "分页查询退款申请记录，包含用户姓名、活动标题、审核记录等信息",
             parameters = {
