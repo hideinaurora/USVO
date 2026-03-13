@@ -70,5 +70,11 @@ public class UserEntity implements Serializable {
     @TableLogic
     private Integer isDeleted;
 
+  /**
+   * 微信id
+   */
+    @TableField(value = "wx_id")
+    private String wxId;
+
 
 }

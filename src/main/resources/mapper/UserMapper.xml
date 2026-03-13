@@ -11,11 +11,12 @@
         <result column="login_password" property="loginPassword" />
         <result column="user_status" property="userStatus" />
         <result column="is_deleted" property="isDeleted" />
+        <result column="wx_id" property="wxId" />
     </resultMap>
 
     <!-- 通用查询结果列 -->
     <sql id="Base_Column_List">
-        id, user_name, gmt_modify, login_name, login_password, user_status, is_deleted
+        id, user_name, gmt_modify, login_name, login_password, user_status, is_deleted, wx_id
     </sql>
 
 </mapper>

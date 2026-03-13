@@ -103,7 +103,7 @@ public class CodeGenerator {
         // 生成文件前缀路径，默认data
         entity.setModuleName("");
         // 生成文件名配置信息
-        entity.setTables(new String[]{"basic_user","sys_admin","activity_apply","activity_apply_pay","activity_apply_user","activity_refund","activity_refund_examine"});
+        entity.setTables(new String[]{"basic_user"});
         entity.setLogicDeleteField("is_deleted");
         genTableTemplate(entity);
     }
