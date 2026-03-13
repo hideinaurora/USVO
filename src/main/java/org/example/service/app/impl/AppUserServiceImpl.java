@@ -379,12 +379,6 @@ public class AppUserServiceImpl implements AppUserService {
                 payOrder.setOriginalAmount(expense);
                 payOrder.setTotalAmount(expense);
 
-                // 设置商户名称
-                payOrder.setMerName("活动报名平台");
-
-                // 生成序列号
-                payOrder.setSeqId(UUID.randomUUID().toString().replace("-", ""));
-
                 // 设置订单过期时间（30分钟后）
                 LocalDateTime expireTime = now.plusMinutes(ORDER_EXPIRE_MINUTES);
                 payOrder.setExpireTime(expireTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
