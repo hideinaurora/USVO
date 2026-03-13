@@ -44,6 +44,9 @@ public class ActivityVO implements Serializable {
     @Schema(description = "限制人数", example = "50")
     private Integer limitNum;
 
+    @Schema(description = "剩余名额数", example = "50")
+    private Integer remainingQuota;
+
     @Schema(description = "报名状态：0-未报名，1-待支付，2-支付完成", example = "0")
     private Integer applyStatus;
 

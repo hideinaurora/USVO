@@ -27,7 +27,10 @@ import org.springframework.transaction.annotation.Transactional;
 import javax.annotation.Resource;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -111,6 +114,7 @@ public class AppUserServiceImpl implements AppUserService {
             vo.setApplyExpense(activity.getApplyExpense());
             vo.setActiveInfo(activity.getActiveInfo());
             vo.setLimitNum(activity.getLimitNum());
+            vo.setRemainingQuota(activity.getRemainingQuota());
 
             // 判断报名状态
             ApplyUserEntity userApply = userApplyMap.get(activity.getApplyId());
