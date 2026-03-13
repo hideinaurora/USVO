@@ -302,7 +302,13 @@ public class AppUserServiceImpl implements AppUserService {
             }
         }
 
-        // 5. 检查活动是否有名额限制
+        // 5. 获取活动费用
+        Integer expense = activity.getApplyExpense() != null ? activity.getApplyExpense() : 0;
+
+        // 6. 判断是否为免费活动
+        boolean isFreeActivity = expense == 0;
+
+        // 7. 检查活动是否有名额限制
         boolean hasQuotaLimit = activity.getLimitNum() != null && activity.getLimitNum() > 0;
         if (hasQuotaLimit) {
             // 尝试锁定名额
@@ -313,19 +319,40 @@ public class AppUserServiceImpl implements AppUserService {
         }
 
         try {
-            // 6. 创建或更新报名记录
+            // 8. 创建或更新报名记录
             ApplyUserEntity userApply;
             if (existApply == null) {
                 userApply = new ApplyUserEntity();
                 userApply.setUserId(userId);
                 userApply.setApplyId(request.getApplyId());
-                userApply.setIsPay(0); // 未支付
+
+                // 如果是免费活动，直接设置为已支付
+                if (isFreeActivity) {
+                    userApply.setIsPay(1); // 已支付
+                } else {
+                    userApply.setIsPay(0); // 未支付
+                }
+
                 applyUserService.save(userApply);
             } else {
                 userApply = existApply;
             }
 
-            // 7. 创建支付订单
+            // 9. 判断是否需要创建支付订单
+            if (isFreeActivity) {
+                // 免费活动直接报名成功，不需要创建支付订单
+                ApplyResponseVO response = new ApplyResponseVO();
+                response.setEnrollRecordId(userApply.getId());
+                response.setPayOrderId(null);
+                response.setMerOrderId(null);
+                response.setApplyStatus(1); // 已支付
+                response.setExpireMinutes(0);
+
+                log.info("用户免费活动报名成功：userId={}, applyId={}", userId, request.getApplyId());
+                return response;
+            }
+
+            // 10. 创建支付订单（付费活动）
             ApplyPayEntity payOrder = new ApplyPayEntity();
             payOrder.setUserId(userId);
             payOrder.setApplyId(request.getApplyId());
@@ -340,7 +367,6 @@ public class AppUserServiceImpl implements AppUserService {
             payOrder.setOrderDesc(orderDesc);
 
             // 设置金额
-            Integer expense = activity.getApplyExpense() != null ? activity.getApplyExpense() : 0;
             payOrder.setOriginalAmount(expense);
             payOrder.setTotalAmount(expense);
 
@@ -356,7 +382,7 @@ public class AppUserServiceImpl implements AppUserService {
 
             applyPayService.save(payOrder);
 
-            // 8. 发送延迟消息到MQ，30分钟后检查订单状态
+            // 11. 发送延迟消息到MQ，30分钟后检查订单状态
             try {
                 delayedProducer.sendOrderCancelMessage(String.valueOf(payOrder.getId()), ORDER_EXPIRE_MINUTES);
             } catch (Exception e) {
@@ -364,7 +390,7 @@ public class AppUserServiceImpl implements AppUserService {
                 // 不影响主流程，仅记录日志
             }
 
-            // 9. 构建响应
+            // 12. 构建响应
             ApplyResponseVO response = new ApplyResponseVO();
             response.setEnrollRecordId(userApply.getId());
             response.setPayOrderId(payOrder.getId());
@@ -372,7 +398,7 @@ public class AppUserServiceImpl implements AppUserService {
             response.setApplyStatus(0); // 待支付
             response.setExpireMinutes(ORDER_EXPIRE_MINUTES);
 
-            log.info("用户报名成功：userId={}, applyId={}, payOrderId={}", userId, request.getApplyId(), payOrder.getId());
+            log.info("用户付费活动报名成功：userId={}, applyId={}, payOrderId={}", userId, request.getApplyId(), payOrder.getId());
             return response;
 
         } catch (Exception e) {
