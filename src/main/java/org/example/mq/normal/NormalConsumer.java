@@ -4,6 +4,8 @@ import com.rabbitmq.client.Channel;
 import lombok.extern.slf4j.Slf4j;
 import org.example.entity.failed.delayed.DelayedMessageEntity;
 import org.example.service.failed.delayed.DelayedMessageService;
+import org.redisson.api.RBucket;
+import org.redisson.api.RedissonClient;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -12,6 +14,7 @@ import org.springframework.stereotype.Component;
 import javax.annotation.Resource;
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 普通队列消费者
@@ -26,12 +29,12 @@ public class NormalConsumer {
 
     @Resource
     private DelayedMessageService delayedMessageService;
+    @Resource
+    private RedissonClient redissonClient;
 
-    // 重试次数计数器（生产环境应使用Redis等存储）
-    private static final java.util.concurrent.ConcurrentHashMap<String, Integer> RETRY_COUNT_MAP =
-            new java.util.concurrent.ConcurrentHashMap<>();
-
+    private static final String RETRY_COUNT_PREFIX = "mq:retry:normal:";
     private static final int MAX_RETRY_COUNT = 3;
+    private static final long RETRY_COUNT_TTL_HOURS = 24; // 重试计数24小时后过期
 
     /**
      * 监听普通队列
@@ -72,7 +75,7 @@ public class NormalConsumer {
                 // 拒绝消息，不重新入队，进入死信队列
                 channel.basicNack(deliveryTag, false, false);
                 // 清除重试计数
-                RETRY_COUNT_MAP.remove(messageId);
+                removeRetryCount(messageId);
                 return;
             }
 
@@ -84,7 +87,7 @@ public class NormalConsumer {
             log.info("【普通队列消费者】✅ 消息处理完成，已确认");
 
             // 清除重试计数
-            RETRY_COUNT_MAP.remove(messageId);
+            removeRetryCount(messageId);
 
         } catch (Exception e) {
             log.error("【普通队列消费者】❌ 消息处理失败", e);
@@ -97,7 +100,7 @@ public class NormalConsumer {
                 // 超过最大重试次数，进入死信队列
                 log.error("【普通队列消费者】❌ 超过最大重试次数，消息进入死信队列");
                 channel.basicNack(deliveryTag, false, false);
-                RETRY_COUNT_MAP.remove(messageId);
+                removeRetryCount(messageId);
             } else {
                 // 重新入队，等待下次消费
                 channel.basicNack(deliveryTag, false, true);
@@ -126,7 +129,10 @@ public class NormalConsumer {
         if (messageId == null) {
             messageId = String.valueOf(message.getMessageProperties().getDeliveryTag());
         }
-        return RETRY_COUNT_MAP.getOrDefault(messageId, 0);
+        String key = RETRY_COUNT_PREFIX + messageId;
+        RBucket<Integer> bucket = redissonClient.getBucket(key);
+        Integer count = bucket.get();
+        return count != null ? count : 0;
     }
 
     /**
@@ -137,7 +143,22 @@ public class NormalConsumer {
         if (messageId == null) {
             messageId = String.valueOf(message.getMessageProperties().getDeliveryTag());
         }
-        return RETRY_COUNT_MAP.merge(messageId, 1, Integer::sum);
+        String key = RETRY_COUNT_PREFIX + messageId;
+        RBucket<Integer> bucket = redissonClient.getBucket(key);
+        Integer currentCount = bucket.get();
+        int newCount = (currentCount != null ? currentCount : 0) + 1;
+        bucket.set(newCount, RETRY_COUNT_TTL_HOURS, TimeUnit.HOURS);
+        return newCount;
+    }
+
+    /**
+     * 删除重试次数
+     */
+    private void removeRetryCount(String messageId) {
+        if (messageId != null) {
+            String key = RETRY_COUNT_PREFIX + messageId;
+            redissonClient.getBucket(key).delete();
+        }
     }
 
     /**
