@@ -49,6 +49,7 @@ public class ApplyLockService {
 
                     // 更新数据库
                     ApplyEntity entity = new ApplyEntity();
+                    entity.setLimitNum((int) (entity.getLimitNum() + quantity));
                     entity.setApplyId(batchId);
                     entity.setRemainingQuota((int) newStock);
                     service.updateById(entity);
@@ -104,6 +105,7 @@ public class ApplyLockService {
                     // 更新数据库
                     ApplyEntity entity = new ApplyEntity();
                     entity.setApplyId(batchId);
+                    entity.setLimitNum((int) (entity.getLimitNum() - quantity));
                     entity.setRemainingQuota((int) newStock);
                     service.updateById(entity);
 
