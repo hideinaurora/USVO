@@ -12,8 +12,10 @@ import org.example.common.PageResult;
 import org.example.config.exception.CommonJsonException;
 import org.example.dto.activity.ApplyQueryDTO;
 import org.example.dto.activity.ApplySaveDTO;
+import org.example.dto.activity.ApplyUserQueryDTO;
 import org.example.service.activity.apply.ApplyService;
 import org.example.vo.activity.ApplyDetailVO;
+import org.example.vo.activity.ApplyUserDetailVO;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
@@ -89,6 +91,43 @@ public class ApplyController {
         } catch (Exception e) {
             log.error("查询活动详情失败，applyId={}", applyId, e);
             throw new CommonJsonException("查询活动详情失败");
+        }
+    }
+
+    @Operation(summary = "分页查询活动报名学生列表", description = "根据活动ID查询报名学生列表，包含用户姓名、支付状态等信息",
+            parameters = {
+                @Parameter(name = "token", description = "JWT访问令牌", required = true, in = ParameterIn.HEADER)
+            })
+    @PostMapping("/users/page")
+    @RequiresPermissions(value = "apply:users:page", apiAuth = {ApiAuth.ADMIN})
+    public ApiResponse<PageResult<ApplyUserDetailVO>> queryApplyUserPage(@RequestBody ApplyUserQueryDTO queryDTO) {
+        try {
+            PageResult<ApplyUserDetailVO> result = applyService.queryApplyUserPage(queryDTO);
+            return ApiResponse.success(result);
+        } catch (CommonJsonException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("分页查询活动报名学生失败", e);
+            throw new CommonJsonException("分页查询活动报名学生失败");
+        }
+    }
+
+    @Operation(summary = "查询活动报名学生列表（不分页）", description = "根据活动ID查询所有报名学生",
+            parameters = {
+                @Parameter(name = "token", description = "JWT访问令牌", required = true, in = ParameterIn.HEADER)
+            })
+    @GetMapping("/users/{applyId}")
+    @RequiresPermissions(value = "apply:users:list", apiAuth = {ApiAuth.ADMIN})
+    public ApiResponse<List<ApplyUserDetailVO>> queryApplyUserList(
+            @Parameter(description = "活动ID", required = true) @PathVariable Long applyId) {
+        try {
+            List<ApplyUserDetailVO> list = applyService.queryApplyUserList(applyId);
+            return ApiResponse.success(list);
+        } catch (CommonJsonException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("查询活动报名学生列表失败，applyId={}", applyId, e);
+            throw new CommonJsonException("查询活动报名学生列表失败");
         }
     }
 

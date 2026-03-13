@@ -1,6 +1,7 @@
 package org.example.service.activity.apply.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import lombok.extern.slf4j.Slf4j;
@@ -9,16 +10,21 @@ import org.example.common.PageResult;
 import org.example.config.exception.CommonJsonException;
 import org.example.dto.activity.ApplyQueryDTO;
 import org.example.dto.activity.ApplySaveDTO;
+import org.example.dto.activity.ApplyUserQueryDTO;
 import org.example.entity.activity.apply.ApplyEntity;
 import org.example.entity.activity.apply.ApplyPayEntity;
 import org.example.entity.activity.apply.ApplyUserEntity;
 import org.example.entity.activity.refund.RefundEntity;
+import org.example.entity.basic.user.UserEntity;
 import org.example.mapper.activity.apply.ApplyMapper;
 import org.example.service.activity.apply.ApplyPayService;
 import org.example.service.activity.apply.ApplyService;
 import org.example.service.activity.apply.ApplyUserService;
 import org.example.service.activity.refund.RefundService;
+import org.example.service.basic.user.UserService;
+import org.example.utils.StringTools;
 import org.example.vo.activity.ApplyDetailVO;
+import org.example.vo.activity.ApplyUserDetailVO;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -50,6 +56,9 @@ public class ApplyServiceImpl extends ServiceImpl<ApplyMapper, ApplyEntity> impl
 
     @Resource
     private RefundService refundService;
+
+    @Resource
+    private UserService userService;
 
     @Override
     public PageResult<ApplyDetailVO> queryPage(ApplyQueryDTO queryDTO) {
@@ -235,6 +244,117 @@ public class ApplyServiceImpl extends ServiceImpl<ApplyMapper, ApplyEntity> impl
             Integer refundAmount = refundAmountMap.getOrDefault(applyId, 0);
             vo.setRefundTotalAmount(refundAmount);
             vo.setRefundTotalAmountYuan(refundAmount / 100.0);
+
+            return vo;
+        }).collect(Collectors.toList());
+    }
+
+    @Override
+    public PageResult<ApplyUserDetailVO> queryApplyUserPage(ApplyUserQueryDTO queryDTO) {
+        // 1. 构建分页查询
+        Page<ApplyUserEntity> page = new Page<>(queryDTO.getPageNum(), queryDTO.getPageSize());
+        QueryWrapper<ApplyUserEntity> queryWrapper = new QueryWrapper<>();
+
+        // 2. 活动ID查询
+        if (queryDTO.getApplyId() == null) {
+            throw new CommonJsonException("活动ID不能为空");
+        }
+        queryWrapper.eq("apply_id", queryDTO.getApplyId());
+
+        // 3. 支付状态查询
+        if (queryDTO.getIsPay() != null) {
+            queryWrapper.eq("is_pay", queryDTO.getIsPay());
+        }
+
+        if (!StringTools.isNullOrEmpty(queryDTO.getUserName())) {
+            List<UserEntity> user = userService.list(
+                    Wrappers.<UserEntity>lambdaQuery()
+                            .like(UserEntity::getUserName, queryDTO.getUserName())
+            );
+            if (user.isEmpty()) {
+                return PageResult.of(
+                        queryDTO.getPageNum(),
+                        queryDTO.getPageSize(),
+                        0L,
+                        Collections.emptyList()
+                );
+            }
+            queryWrapper.eq("user_id", user.stream().map(UserEntity::getId).collect(Collectors.toList()));
+        }
+
+
+        // 4. 按创建时间倒序
+        queryWrapper.orderByDesc("gmt_create");
+
+        // 5. 执行分页查询
+        Page<ApplyUserEntity> pageResult = applyUserService.page(page, queryWrapper);
+
+        // 6. 获取用户信息并填充
+        List<ApplyUserDetailVO> voList = fillUserInfo(pageResult.getRecords());
+
+        return PageResult.of(
+                queryDTO.getPageNum(),
+                queryDTO.getPageSize(),
+                pageResult.getTotal(),
+                voList
+        );
+    }
+
+    @Override
+    public List<ApplyUserDetailVO> queryApplyUserList(Long applyId) {
+        if (applyId == null) {
+            throw new CommonJsonException("活动ID不能为空");
+        }
+
+        // 查询报名记录
+        QueryWrapper<ApplyUserEntity> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("apply_id", applyId);
+        queryWrapper.orderByDesc("gmt_create");
+        List<ApplyUserEntity> entityList = applyUserService.list(queryWrapper);
+
+        // 填充用户信息
+        return fillUserInfo(entityList);
+    }
+
+    /**
+     * 填充用户信息
+     *
+     * @param entityList 报名记录列表
+     * @return 包含用户信息的VO列表
+     */
+    private List<ApplyUserDetailVO> fillUserInfo(List<ApplyUserEntity> entityList) {
+        if (entityList == null || entityList.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        // 获取所有用户ID
+        List<Long> userIds = entityList.stream()
+                .map(ApplyUserEntity::getUserId)
+                .collect(Collectors.toList());
+
+        // 批量查询用户信息
+        QueryWrapper<UserEntity> userQuery = new QueryWrapper<>();
+        userQuery.in("id", userIds);
+        List<UserEntity> userList = userService.list(userQuery);
+        Map<Long, UserEntity> userMap = userList.stream()
+                .collect(Collectors.toMap(UserEntity::getId, user -> user));
+
+        // 组装VO
+        return entityList.stream().map(entity -> {
+            ApplyUserDetailVO vo = new ApplyUserDetailVO();
+            BeanUtils.copyProperties(entity, vo);
+
+            // 设置用户信息
+            UserEntity user = userMap.get(entity.getUserId());
+            if (user != null) {
+                vo.setUserName(user.getUserName());
+                vo.setLoginName(user.getLoginName());
+                vo.setUserStatus(user.getUserStatus());
+                vo.setUserStatusDesc(user.getUserStatus() == 1 ? "正常" : "禁用");
+            }
+
+            // 设置支付状态描述
+            vo.setIsPayDesc(entity.getIsPay() == 1 ? "已支付" : "未支付");
 
             return vo;
         }).collect(Collectors.toList());

@@ -4,8 +4,10 @@ package org.example.service.activity.apply;
 import org.example.common.PageResult;
 import org.example.dto.activity.ApplyQueryDTO;
 import org.example.dto.activity.ApplySaveDTO;
+import org.example.dto.activity.ApplyUserQueryDTO;
 import org.example.entity.activity.apply.ApplyEntity;
 import org.example.vo.activity.ApplyDetailVO;
+import org.example.vo.activity.ApplyUserDetailVO;
 import com.baomidou.mybatisplus.extension.service.IService;
 
 import java.util.List;
@@ -66,4 +68,20 @@ public interface ApplyService extends IService<ApplyEntity> {
      * @return 是否成功
      */
     Boolean delete(String applyIds);
+
+    /**
+     * 分页查询活动报名学生列表
+     *
+     * @param queryDTO 查询参数
+     * @return 分页结果
+     */
+    PageResult<ApplyUserDetailVO> queryApplyUserPage(ApplyUserQueryDTO queryDTO);
+
+    /**
+     * 查询活动报名学生列表（不分页）
+     *
+     * @param applyId 活动ID
+     * @return 报名学生列表
+     */
+    List<ApplyUserDetailVO> queryApplyUserList(Long applyId);
 }
