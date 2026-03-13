@@ -6,20 +6,24 @@ import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
 import org.example.aop.annotation.ApiAuth;
+import org.example.aop.annotation.ApiIdempotent;
 import org.example.aop.annotation.RequiresPermissions;
 import org.example.common.ApiResponse;
 import org.example.config.exception.CommonJsonException;
 import org.example.dto.AppLoginRequestDTO;
 import org.example.dto.AppRegisterRequestDTO;
+import org.example.dto.ApplyRequestDTO;
 import org.example.service.TokenService;
 import org.example.service.app.AppUserService;
 import org.example.service.basic.user.UserService;
 import org.example.vo.ActivityVO;
 import org.example.vo.AppLoginResponseVO;
+import org.example.vo.ApplyResponseVO;
 import org.example.vo.EnrolledActivityVO;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
+import javax.validation.Valid;
 import java.util.List;
 
 /**
@@ -78,7 +82,6 @@ public class AppController {
     public ApiResponse<List<ActivityVO>> getActivityList() {
         try {
             Long userId = tokenService.getUserId();
-
             List<ActivityVO> activities = appUserService.getActivityListForApp(userId);
             return ApiResponse.success(activities);
         } catch (CommonJsonException e) {
@@ -105,6 +108,26 @@ public class AppController {
         } catch (Exception e) {
             log.error("查询已报名活动列表失败", e);
             throw new CommonJsonException("查询已报名活动列表失败，请稍后重试");
+        }
+    }
+
+    @Operation(summary = "用户报名活动", description = "用户报名活动，支持名额限制，创建30分钟有效的支付订单，超时未支付自动释放名额",
+            parameters = {
+                    @Parameter(name = "token", description = "JWT访问令牌", required = true, in = ParameterIn.HEADER)
+            })
+    @PostMapping("/apply")
+    @RequiresPermissions(value = "app:apply:create", apiAuth = {ApiAuth.USER})
+    @ApiIdempotent(expireSeconds = 5)
+    public ApiResponse<ApplyResponseVO> applyActivity(@Valid @RequestBody ApplyRequestDTO request) {
+        try {
+            Long userId = tokenService.getUserId();
+            ApplyResponseVO response = appUserService.applyActivity(userId, request);
+            return ApiResponse.success(response);
+        } catch (CommonJsonException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("报名活动失败", e);
+            throw new CommonJsonException("报名活动失败，请稍后重试");
         }
     }
 }

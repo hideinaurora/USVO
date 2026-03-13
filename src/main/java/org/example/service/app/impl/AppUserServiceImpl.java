@@ -1,30 +1,43 @@
 package org.example.service.app.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import lombok.extern.slf4j.Slf4j;
+import org.example.config.exception.CommonJsonException;
+import org.example.dto.ApplyRequestDTO;
 import org.example.entity.activity.apply.ApplyEntity;
 import org.example.entity.activity.apply.ApplyPayEntity;
 import org.example.entity.activity.apply.ApplyUserEntity;
 import org.example.entity.activity.refund.RefundEntity;
 import org.example.entity.activity.refund.RefundExamineEntity;
+import org.example.mq.DelayedProducer;
+import org.example.service.ApplyLockService;
 import org.example.service.activity.apply.ApplyPayService;
 import org.example.service.activity.apply.ApplyService;
 import org.example.service.activity.apply.ApplyUserService;
 import org.example.service.activity.refund.RefundExamineService;
 import org.example.service.activity.refund.RefundService;
 import org.example.service.app.AppUserService;
+import org.example.utils.StringTools;
 import org.example.vo.*;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 public class AppUserServiceImpl implements AppUserService {
+
+    private static final int ORDER_EXPIRE_MINUTES = 30; // 订单过期时间（分钟）
 
     @Resource
     private ApplyService applyService;
@@ -40,6 +53,12 @@ public class AppUserServiceImpl implements AppUserService {
 
     @Resource
     private RefundExamineService refundExamineService;
+
+    @Resource
+    private ApplyLockService applyLockService;
+
+    @Resource
+    private DelayedProducer delayedProducer;
 
     @Override
     public List<ActivityVO> getActivityListForApp(Long userId) {
@@ -228,5 +247,153 @@ public class AppUserServiceImpl implements AppUserService {
         }
 
         return resultList;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public ApplyResponseVO applyActivity(Long userId, ApplyRequestDTO request) {
+        // 1. 参数校验
+        if (request.getApplyId() == null) {
+            throw new CommonJsonException("活动ID不能为空");
+        }
+
+        // 2. 查询活动信息
+        ApplyEntity activity = applyService.getById(request.getApplyId());
+        if (activity == null) {
+            throw new CommonJsonException("活动不存在");
+        }
+
+        // 3. 检查报名时间是否在有效期内
+        LocalDateTime now = LocalDateTime.now();
+        if (activity.getApplyStartTime() != null && now.isBefore(activity.getApplyStartTime())) {
+            throw new CommonJsonException("活动报名尚未开始");
+        }
+        if (activity.getApplyEndTime() != null && now.isAfter(activity.getApplyEndTime())) {
+            throw new CommonJsonException("活动报名已结束");
+        }
+
+        // 4. 检查用户是否已报名
+        QueryWrapper<ApplyUserEntity> userApplyWrapper = new QueryWrapper<>();
+        userApplyWrapper.eq("user_id", userId);
+        userApplyWrapper.eq("apply_id", request.getApplyId());
+        ApplyUserEntity existApply = applyUserService.getOne(userApplyWrapper);
+        if (existApply != null) {
+            if (existApply.getIsPay() == 1) {
+                throw new CommonJsonException("您已报名并支付该活动");
+            } else {
+                // 如果已报名但未支付，检查是否有未支付订单
+                QueryWrapper<ApplyPayEntity> payWrapper = new QueryWrapper<>();
+                payWrapper.eq("user_id", userId);
+                payWrapper.eq("apply_id", request.getApplyId());
+                payWrapper.eq("pay_status", 0); // 未支付
+                payWrapper.orderByDesc("id");
+                payWrapper.last("LIMIT 1");
+                ApplyPayEntity existPay = applyPayService.getOne(payWrapper);
+                if (existPay != null) {
+                    // 返回现有订单信息
+                    ApplyResponseVO response = new ApplyResponseVO();
+                    response.setEnrollRecordId(existApply.getId());
+                    response.setPayOrderId(existPay.getId());
+                    response.setMerOrderId(existPay.getMerOrderId());
+                    response.setApplyStatus(0);
+                    response.setExpireMinutes(ORDER_EXPIRE_MINUTES);
+                    return response;
+                }
+            }
+        }
+
+        // 5. 检查活动是否有名额限制
+        boolean hasQuotaLimit = activity.getLimitNum() != null && activity.getLimitNum() > 0;
+        if (hasQuotaLimit) {
+            // 尝试锁定名额
+            boolean locked = applyLockService.decreaseApply(request.getApplyId(), 1L);
+            if (!locked) {
+                throw new CommonJsonException("活动名额已满，报名失败");
+            }
+        }
+
+        try {
+            // 6. 创建或更新报名记录
+            ApplyUserEntity userApply;
+            if (existApply == null) {
+                userApply = new ApplyUserEntity();
+                userApply.setUserId(userId);
+                userApply.setApplyId(request.getApplyId());
+                userApply.setIsPay(0); // 未支付
+                applyUserService.save(userApply);
+            } else {
+                userApply = existApply;
+            }
+
+            // 7. 创建支付订单
+            ApplyPayEntity payOrder = new ApplyPayEntity();
+            payOrder.setUserId(userId);
+            payOrder.setApplyId(request.getApplyId());
+            payOrder.setPayStatus(0); // 未支付
+
+            // 生成商户订单号
+            String merOrderId = generateMerOrderId(userId, request.getApplyId());
+            payOrder.setMerOrderId(merOrderId);
+
+            // 设置订单描述
+            String orderDesc = String.format("报名：%s", activity.getApplyTitle());
+            payOrder.setOrderDesc(orderDesc);
+
+            // 设置金额
+            Integer expense = activity.getApplyExpense() != null ? activity.getApplyExpense() : 0;
+            payOrder.setOriginalAmount(expense);
+            payOrder.setTotalAmount(expense);
+
+            // 设置商户名称
+            payOrder.setMerName("活动报名平台");
+
+            // 生成序列号
+            payOrder.setSeqId(UUID.randomUUID().toString().replace("-", ""));
+
+            // 设置订单过期时间（30分钟后）
+            LocalDateTime expireTime = now.plusMinutes(ORDER_EXPIRE_MINUTES);
+            payOrder.setExpireTime(expireTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+
+            applyPayService.save(payOrder);
+
+            // 8. 发送延迟消息到MQ，30分钟后检查订单状态
+            try {
+                delayedProducer.sendOrderCancelMessage(String.valueOf(payOrder.getId()), ORDER_EXPIRE_MINUTES);
+            } catch (Exception e) {
+                log.error("发送延迟消息失败，订单ID：{}", payOrder.getId(), e);
+                // 不影响主流程，仅记录日志
+            }
+
+            // 9. 构建响应
+            ApplyResponseVO response = new ApplyResponseVO();
+            response.setEnrollRecordId(userApply.getId());
+            response.setPayOrderId(payOrder.getId());
+            response.setMerOrderId(payOrder.getMerOrderId());
+            response.setApplyStatus(0); // 待支付
+            response.setExpireMinutes(ORDER_EXPIRE_MINUTES);
+
+            log.info("用户报名成功：userId={}, applyId={}, payOrderId={}", userId, request.getApplyId(), payOrder.getId());
+            return response;
+
+        } catch (Exception e) {
+            // 如果报名失败，释放锁定的名额
+            if (hasQuotaLimit) {
+                try {
+                    applyLockService.increaseApply(request.getApplyId(), 1L);
+                } catch (Exception ex) {
+                    log.error("释放名额失败：applyId={}", request.getApplyId(), ex);
+                }
+            }
+            throw e;
+        }
+    }
+
+    /**
+     * 生成商户订单号
+     */
+    private String generateMerOrderId(Long userId, Long applyId) {
+        long timestamp = System.currentTimeMillis();
+        int random = (int) (Math.random() * 10000);
+        return String.format("MER%d%d%04d", userId, timestamp, random);
     }
 }

@@ -1,6 +1,8 @@
 package org.example.service.app;
 
+import org.example.dto.ApplyRequestDTO;
 import org.example.vo.ActivityVO;
+import org.example.vo.ApplyResponseVO;
 import org.example.vo.EnrolledActivityVO;
 
 import java.util.List;
@@ -21,4 +23,13 @@ public interface AppUserService {
      * @return 已报名活动列表
      */
     List<EnrolledActivityVO> getEnrolledActivityList(Long userId);
+
+    /**
+     * 用户报名活动
+     *
+     * @param userId 用户ID
+     * @param request 报名请求
+     * @return 报名响应，包含支付订单信息
+     */
+    ApplyResponseVO applyActivity(Long userId, ApplyRequestDTO request);
 }
