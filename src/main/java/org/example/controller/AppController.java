@@ -6,7 +6,6 @@ import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
 import org.example.aop.annotation.ApiAuth;
-import org.example.aop.annotation.ApiIdempotent;
 import org.example.aop.annotation.RequiresPermissions;
 import org.example.common.ApiResponse;
 import org.example.config.exception.CommonJsonException;
@@ -111,13 +110,12 @@ public class AppController {
         }
     }
 
-    @Operation(summary = "用户报名活动", description = "用户报名活动，支持名额限制，创建30分钟有效的支付订单，超时未支付自动释放名额",
+    @Operation(summary = "用户报名活动", description = "用户报名活动，支持名额限制，创建30分钟有效的支付订单，超时未支付自动释放名额。5秒内同一用户同一活动只能报名一次",
             parameters = {
                     @Parameter(name = "token", description = "JWT访问令牌", required = true, in = ParameterIn.HEADER)
             })
     @PostMapping("/apply")
     @RequiresPermissions(value = "app:apply:create", apiAuth = {ApiAuth.USER})
-    @ApiIdempotent(expireSeconds = 5)
     public ApiResponse<ApplyResponseVO> applyActivity(@Valid @RequestBody ApplyRequestDTO request) {
         try {
             Long userId = tokenService.getUserId();

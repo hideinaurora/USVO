@@ -17,6 +17,7 @@ import org.example.service.activity.apply.ApplyUserService;
 import org.example.service.activity.refund.RefundExamineService;
 import org.example.service.activity.refund.RefundService;
 import org.example.service.app.AppUserService;
+import org.example.utils.RedisUtil;
 import org.example.utils.StringTools;
 import org.example.vo.*;
 import org.springframework.beans.BeanUtils;
@@ -27,6 +28,7 @@ import javax.annotation.Resource;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -34,6 +36,8 @@ import java.util.stream.Collectors;
 public class AppUserServiceImpl implements AppUserService {
 
     private static final int ORDER_EXPIRE_MINUTES = 30; // 订单过期时间（分钟）
+    private static final long IDEMPOTENT_EXPIRE_SECONDS = 5; // 幂等性过期时间（秒）
+    private static final String APPLY_IDEMPOTENT_PREFIX = "apply:idempotent:"; // 报名幂等性Redis前缀
 
     @Resource
     private ApplyService applyService;
@@ -55,6 +59,9 @@ public class AppUserServiceImpl implements AppUserService {
 
     @Resource
     private DelayedProducer delayedProducer;
+
+    @Resource
+    private RedisUtil redisUtil;
 
     @Override
     public List<ActivityVO> getActivityListForApp(Long userId) {
@@ -248,164 +255,176 @@ public class AppUserServiceImpl implements AppUserService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ApplyResponseVO applyActivity(Long userId, ApplyRequestDTO request) {
-        // 1. 参数校验
-        if (request.getApplyId() == null) {
-            throw new CommonJsonException("活动ID不能为空");
+        // 1. 幂等性校验：使用 userId + applyId 作为 key
+        String idempotentKey = APPLY_IDEMPOTENT_PREFIX + userId + ":" + request.getApplyId();
+        boolean hasKey = redisUtil.exists(idempotentKey);
+        if (hasKey) {
+            log.warn("重复报名请求被拦截: userId={}, applyId={}", userId, request.getApplyId());
+            throw new CommonJsonException("请勿重复提交，请稍后再试");
         }
 
-        // 2. 查询活动信息
-        ApplyEntity activity = applyService.getById(request.getApplyId());
-        if (activity == null) {
-            throw new CommonJsonException("活动不存在");
-        }
-
-        // 3. 检查报名时间是否在有效期内
-        LocalDateTime now = LocalDateTime.now();
-        if (activity.getApplyStartTime() != null && now.isBefore(activity.getApplyStartTime())) {
-            throw new CommonJsonException("活动报名尚未开始");
-        }
-        if (activity.getApplyEndTime() != null && now.isAfter(activity.getApplyEndTime())) {
-            throw new CommonJsonException("活动报名已结束");
-        }
-
-        // 4. 检查用户是否已报名
-        QueryWrapper<ApplyUserEntity> userApplyWrapper = new QueryWrapper<>();
-        userApplyWrapper.eq("user_id", userId);
-        userApplyWrapper.eq("apply_id", request.getApplyId());
-        ApplyUserEntity existApply = applyUserService.getOne(userApplyWrapper);
-        if (existApply != null) {
-            if (existApply.getIsPay() == 1) {
-                throw new CommonJsonException("您已报名并支付该活动");
-            } else {
-                // 如果已报名但未支付，检查是否有未支付订单
-                QueryWrapper<ApplyPayEntity> payWrapper = new QueryWrapper<>();
-                payWrapper.eq("user_id", userId);
-                payWrapper.eq("apply_id", request.getApplyId());
-                payWrapper.eq("pay_status", 0); // 未支付
-                payWrapper.orderByDesc("id");
-                payWrapper.last("LIMIT 1");
-                ApplyPayEntity existPay = applyPayService.getOne(payWrapper);
-                if (existPay != null) {
-                    // 返回现有订单信息
-                    ApplyResponseVO response = new ApplyResponseVO();
-                    response.setEnrollRecordId(existApply.getId());
-                    response.setPayOrderId(existPay.getId());
-                    response.setMerOrderId(existPay.getMerOrderId());
-                    response.setApplyStatus(0);
-                    response.setExpireMinutes(ORDER_EXPIRE_MINUTES);
-                    return response;
-                }
-            }
-        }
-
-        // 5. 获取活动费用
-        Integer expense = activity.getApplyExpense() != null ? activity.getApplyExpense() : 0;
-
-        // 6. 判断是否为免费活动
-        boolean isFreeActivity = expense == 0;
-
-        // 7. 检查活动是否有名额限制
-        boolean hasQuotaLimit = activity.getLimitNum() != null && activity.getLimitNum() > 0;
-        if (hasQuotaLimit) {
-            // 尝试锁定名额
-            boolean locked = applyLockService.decreaseApply(request.getApplyId(), 1L);
-            if (!locked) {
-                throw new CommonJsonException("活动名额已满，报名失败");
-            }
-        }
+        // 设置幂等性标识，5秒过期
+        redisUtil.set(idempotentKey, "1", IDEMPOTENT_EXPIRE_SECONDS, TimeUnit.SECONDS);
 
         try {
-            // 8. 创建或更新报名记录
-            ApplyUserEntity userApply;
-            if (existApply == null) {
-                userApply = new ApplyUserEntity();
-                userApply.setUserId(userId);
-                userApply.setApplyId(request.getApplyId());
-
-                // 如果是免费活动，直接设置为已支付
-                if (isFreeActivity) {
-                    userApply.setIsPay(1); // 已支付
-                } else {
-                    userApply.setIsPay(0); // 未支付
-                }
-
-                applyUserService.save(userApply);
-            } else {
-                userApply = existApply;
+            // 3. 查询活动信息
+            ApplyEntity activity = applyService.getById(request.getApplyId());
+            if (activity == null) {
+                throw new CommonJsonException("活动不存在");
+            }
+            // 4. 检查报名时间是否在有效期内
+            LocalDateTime now = LocalDateTime.now();
+            if (activity.getApplyStartTime() != null && now.isBefore(activity.getApplyStartTime())) {
+                throw new CommonJsonException("活动报名尚未开始");
+            }
+            if (activity.getApplyEndTime() != null && now.isAfter(activity.getApplyEndTime())) {
+                throw new CommonJsonException("活动报名已结束");
             }
 
-            // 9. 判断是否需要创建支付订单
-            if (isFreeActivity) {
-                // 免费活动直接报名成功，不需要创建支付订单
+            // 5. 检查用户是否已报名
+            QueryWrapper<ApplyUserEntity> userApplyWrapper = new QueryWrapper<>();
+            userApplyWrapper.eq("user_id", userId);
+            userApplyWrapper.eq("apply_id", request.getApplyId());
+            ApplyUserEntity existApply = applyUserService.getOne(userApplyWrapper);
+            if (existApply != null) {
+                if (existApply.getIsPay() == 1) {
+                    throw new CommonJsonException("您已报名并支付该活动");
+                } else {
+                    // 如果已报名但未支付，检查是否有未支付订单
+                    QueryWrapper<ApplyPayEntity> payWrapper = new QueryWrapper<>();
+                    payWrapper.eq("user_id", userId);
+                    payWrapper.eq("apply_id", request.getApplyId());
+                    payWrapper.eq("pay_status", 0); // 未支付
+                    payWrapper.orderByDesc("id");
+                    payWrapper.last("LIMIT 1");
+                    ApplyPayEntity existPay = applyPayService.getOne(payWrapper);
+                    if (existPay != null) {
+                        // 返回现有订单信息
+                        ApplyResponseVO response = new ApplyResponseVO();
+                        response.setEnrollRecordId(existApply.getId());
+                        response.setPayOrderId(existPay.getId());
+                        response.setMerOrderId(existPay.getMerOrderId());
+                        response.setApplyStatus(0);
+                        response.setExpireMinutes(ORDER_EXPIRE_MINUTES);
+                        return response;
+                    }
+                }
+            }
+
+            // 6. 获取活动费用
+            Integer expense = activity.getApplyExpense() != null ? activity.getApplyExpense() : 0;
+
+            // 7. 判断是否为免费活动
+            boolean isFreeActivity = expense == 0;
+
+            // 8. 检查活动是否有名额限制
+            boolean hasQuotaLimit = activity.getLimitNum() != null && activity.getLimitNum() > 0;
+            if (hasQuotaLimit) {
+                // 尝试锁定名额
+                boolean locked = applyLockService.decreaseApply(request.getApplyId(), 1L);
+                if (!locked) {
+                    throw new CommonJsonException("活动名额已满，报名失败");
+                }
+            }
+
+            try {
+                // 9. 创建或更新报名记录
+                ApplyUserEntity userApply;
+                if (existApply == null) {
+                    userApply = new ApplyUserEntity();
+                    userApply.setUserId(userId);
+                    userApply.setApplyId(request.getApplyId());
+
+                    // 如果是免费活动，直接设置为已支付
+                    if (isFreeActivity) {
+                        userApply.setIsPay(1); // 已支付
+                    } else {
+                        userApply.setIsPay(0); // 未支付
+                    }
+
+                    applyUserService.save(userApply);
+                } else {
+                    userApply = existApply;
+                }
+
+                // 10. 判断是否需要创建支付订单
+                if (isFreeActivity) {
+                    // 免费活动直接报名成功，不需要创建支付订单
+                    ApplyResponseVO response = new ApplyResponseVO();
+                    response.setEnrollRecordId(userApply.getId());
+                    response.setPayOrderId(null);
+                    response.setMerOrderId(null);
+                    response.setApplyStatus(1); // 已支付
+                    response.setExpireMinutes(0);
+
+                    log.info("用户免费活动报名成功：userId={}, applyId={}", userId, request.getApplyId());
+                    return response;
+                }
+
+                // 11. 创建支付订单（付费活动）
+                ApplyPayEntity payOrder = new ApplyPayEntity();
+                payOrder.setUserId(userId);
+                payOrder.setApplyId(request.getApplyId());
+                payOrder.setPayStatus(0); // 未支付
+
+                // 生成商户订单号
+                String merOrderId = generateMerOrderId();
+                payOrder.setMerOrderId(merOrderId);
+
+                // 设置订单描述
+                String orderDesc = String.format("报名：%s", activity.getApplyTitle());
+                payOrder.setOrderDesc(orderDesc);
+
+                // 设置金额
+                payOrder.setOriginalAmount(expense);
+                payOrder.setTotalAmount(expense);
+
+                // 设置商户名称
+                payOrder.setMerName("活动报名平台");
+
+                // 生成序列号
+                payOrder.setSeqId(UUID.randomUUID().toString().replace("-", ""));
+
+                // 设置订单过期时间（30分钟后）
+                LocalDateTime expireTime = now.plusMinutes(ORDER_EXPIRE_MINUTES);
+                payOrder.setExpireTime(expireTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+
+                applyPayService.save(payOrder);
+
+                // 12. 发送延迟消息到MQ，30分钟后检查订单状态
+                try {
+                    delayedProducer.sendOrderCancelMessage(String.valueOf(payOrder.getId()), ORDER_EXPIRE_MINUTES);
+                } catch (Exception e) {
+                    log.error("发送延迟消息失败，订单ID：{}", payOrder.getId(), e);
+                    // 不影响主流程，仅记录日志
+                }
+
+                // 13. 构建响应
                 ApplyResponseVO response = new ApplyResponseVO();
                 response.setEnrollRecordId(userApply.getId());
-                response.setPayOrderId(null);
-                response.setMerOrderId(null);
-                response.setApplyStatus(1); // 已支付
-                response.setExpireMinutes(0);
+                response.setPayOrderId(payOrder.getId());
+                response.setMerOrderId(payOrder.getMerOrderId());
+                response.setApplyStatus(0); // 待支付
+                response.setExpireMinutes(ORDER_EXPIRE_MINUTES);
 
-                log.info("用户免费活动报名成功：userId={}, applyId={}", userId, request.getApplyId());
+                log.info("用户付费活动报名成功：userId={}, applyId={}, payOrderId={}", userId, request.getApplyId(), payOrder.getId());
                 return response;
-            }
 
-            // 10. 创建支付订单（付费活动）
-            ApplyPayEntity payOrder = new ApplyPayEntity();
-            payOrder.setUserId(userId);
-            payOrder.setApplyId(request.getApplyId());
-            payOrder.setPayStatus(0); // 未支付
-
-            // 生成商户订单号
-            String merOrderId = generateMerOrderId();
-            payOrder.setMerOrderId(merOrderId);
-
-            // 设置订单描述
-            String orderDesc = String.format("报名：%s", activity.getApplyTitle());
-            payOrder.setOrderDesc(orderDesc);
-
-            // 设置金额
-            payOrder.setOriginalAmount(expense);
-            payOrder.setTotalAmount(expense);
-
-            // 设置商户名称
-            payOrder.setMerName("活动报名平台");
-
-            // 生成序列号
-            payOrder.setSeqId(UUID.randomUUID().toString().replace("-", ""));
-
-            // 设置订单过期时间（30分钟后）
-            LocalDateTime expireTime = now.plusMinutes(ORDER_EXPIRE_MINUTES);
-            payOrder.setExpireTime(expireTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-
-            applyPayService.save(payOrder);
-
-            // 11. 发送延迟消息到MQ，30分钟后检查订单状态
-            try {
-                delayedProducer.sendOrderCancelMessage(String.valueOf(payOrder.getId()), ORDER_EXPIRE_MINUTES);
             } catch (Exception e) {
-                log.error("发送延迟消息失败，订单ID：{}", payOrder.getId(), e);
-                // 不影响主流程，仅记录日志
-            }
-
-            // 12. 构建响应
-            ApplyResponseVO response = new ApplyResponseVO();
-            response.setEnrollRecordId(userApply.getId());
-            response.setPayOrderId(payOrder.getId());
-            response.setMerOrderId(payOrder.getMerOrderId());
-            response.setApplyStatus(0); // 待支付
-            response.setExpireMinutes(ORDER_EXPIRE_MINUTES);
-
-            log.info("用户付费活动报名成功：userId={}, applyId={}, payOrderId={}", userId, request.getApplyId(), payOrder.getId());
-            return response;
-
-        } catch (Exception e) {
-            // 如果报名失败，释放锁定的名额
-            if (hasQuotaLimit) {
-                try {
-                    applyLockService.increaseApply(request.getApplyId(), 1L);
-                } catch (Exception ex) {
-                    log.error("释放名额失败：applyId={}", request.getApplyId(), ex);
+                // 如果报名失败，释放锁定的名额
+                if (hasQuotaLimit) {
+                    try {
+                        applyLockService.increaseApply(request.getApplyId(), 1L);
+                    } catch (Exception ex) {
+                        log.error("释放名额失败：applyId={}", request.getApplyId(), ex);
+                    }
                 }
+                throw e;
             }
+
+        } catch (CommonJsonException e) {
+            // 业务异常，删除幂等性标识，允许用户重试
+            redisUtil.remove(idempotentKey);
             throw e;
         }
     }
