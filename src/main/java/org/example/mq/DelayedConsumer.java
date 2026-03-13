@@ -5,6 +5,7 @@ import com.rabbitmq.client.Channel;
 import lombok.extern.slf4j.Slf4j;
 import org.example.entity.activity.apply.ApplyPayEntity;
 import org.example.entity.failed.delayed.DelayedMessageEntity;
+import org.example.service.ApplyLockService;
 import org.example.service.activity.apply.ApplyPayService;
 import org.example.service.failed.delayed.DelayedMessageService;
 import org.springframework.amqp.core.Message;
@@ -38,6 +39,8 @@ public class DelayedConsumer {
     private ApplyPayService applyPayService;
     @Resource
     private DelayedMessageService delayedMessageService;
+    @Resource
+    private ApplyLockService applyLockService;
 
     /**
      * 监听延迟队列
@@ -127,21 +130,23 @@ public class DelayedConsumer {
      */
     private void handleOrderTimeoutWithRetry(String message, int retryCount) {
         log.info("【业务处理】执行订单超时取消逻辑: {},重试次数：{}", message, retryCount);
-        try {
-            ApplyPayEntity pay = applyPayService.getOne(
-                    Wrappers.<ApplyPayEntity>lambdaQuery()
-                            .eq(ApplyPayEntity::getMerOrderId, message)
-            );
-            if (pay == null) {
-                log.error("【订单取消】订单号不存在");
-                return;
-            }
-            log.info("【订单取消】✅ 订单超时取消成功:{}", message);
-        } catch (Exception e) {
-            // 1.重新推送到延迟队列，再次取消订单
-            // 2.记录错误日志人工干预
-            log.error("【订单取消】订单取消异常:", e);
+        ApplyPayEntity pay = applyPayService.getOne(
+                Wrappers.<ApplyPayEntity>lambdaQuery()
+                        .eq(ApplyPayEntity::getMerOrderId, message)
+        );
+        if (pay == null) {
+            log.error("【订单取消】订单号不存在");
+            return;
         }
+        if (pay.getPayStatus() == 1) {
+            log.info("【订单取消】订单已支付");
+            return;
+        }
+        // 增强：如果使用第三方支付，需要额外查询第三方支付状态判断
+        // 并建议调用第三方关闭订单接口
+        // 释放锁定报名
+        applyLockService.increaseApply(pay.getApplyId(), 1L);
+        log.info("【订单取消】✅ 订单超时取消成功:{}", message);
     }
 
     /**
