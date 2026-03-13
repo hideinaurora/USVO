@@ -4,6 +4,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Getter;
 import lombok.Setter;
 
+import javax.validation.constraints.NotNull;
+
 /**
  * 活动报名学生查询DTO
  *
@@ -16,6 +18,7 @@ import lombok.Setter;
 public class ApplyUserQueryDTO {
 
     @Schema(description = "活动ID", required = true, example = "1")
+    @NotNull(message = "活动ID不能为空")
     private Long applyId;
 
     @Schema(description = "页码", example = "1")

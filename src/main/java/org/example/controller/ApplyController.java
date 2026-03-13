@@ -18,6 +18,8 @@ import org.example.vo.activity.ApplyDetailVO;
 import org.example.vo.activity.ApplyUserDetailVO;
 import org.springframework.web.bind.annotation.*;
 
+import javax.validation.Valid;
+
 import javax.annotation.Resource;
 import java.util.List;
 
@@ -42,7 +44,7 @@ public class ApplyController {
             })
     @PostMapping("/page")
     @RequiresPermissions(value = "apply:page", apiAuth = {ApiAuth.ADMIN})
-    public ApiResponse<PageResult<ApplyDetailVO>> queryPage(@RequestBody ApplyQueryDTO queryDTO) {
+    public ApiResponse<PageResult<ApplyDetailVO>> queryPage(@Valid @RequestBody ApplyQueryDTO queryDTO) {
         try {
             PageResult<ApplyDetailVO> result = applyService.queryPage(queryDTO);
             return ApiResponse.success(result);
@@ -100,7 +102,7 @@ public class ApplyController {
             })
     @PostMapping("/users/page")
     @RequiresPermissions(value = "apply:users:page", apiAuth = {ApiAuth.ADMIN})
-    public ApiResponse<PageResult<ApplyUserDetailVO>> queryApplyUserPage(@RequestBody ApplyUserQueryDTO queryDTO) {
+    public ApiResponse<PageResult<ApplyUserDetailVO>> queryApplyUserPage(@Valid @RequestBody ApplyUserQueryDTO queryDTO) {
         try {
             PageResult<ApplyUserDetailVO> result = applyService.queryApplyUserPage(queryDTO);
             return ApiResponse.success(result);
@@ -137,7 +139,7 @@ public class ApplyController {
             })
     @PostMapping("/add")
     @RequiresPermissions(value = "apply:add", apiAuth = {ApiAuth.ADMIN})
-    public ApiResponse<Long> add(@RequestBody ApplySaveDTO saveDTO) {
+    public ApiResponse<Long> add(@Valid @RequestBody ApplySaveDTO saveDTO) {
         try {
             Long applyId = applyService.add(saveDTO);
             return ApiResponse.success("新增成功", applyId);
@@ -155,7 +157,7 @@ public class ApplyController {
             })
     @PutMapping("/update")
     @RequiresPermissions(value = "apply:update", apiAuth = {ApiAuth.ADMIN})
-    public ApiResponse<Void> update(@RequestBody ApplySaveDTO saveDTO) {
+    public ApiResponse<Void> update(@Valid @RequestBody ApplySaveDTO saveDTO) {
         try {
             applyService.update(saveDTO);
             return ApiResponse.success();

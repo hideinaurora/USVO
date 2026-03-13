@@ -255,10 +255,7 @@ public class ApplyServiceImpl extends ServiceImpl<ApplyMapper, ApplyEntity> impl
         Page<ApplyUserEntity> page = new Page<>(queryDTO.getPageNum(), queryDTO.getPageSize());
         QueryWrapper<ApplyUserEntity> queryWrapper = new QueryWrapper<>();
 
-        // 2. 活动ID查询
-        if (queryDTO.getApplyId() == null) {
-            throw new CommonJsonException("活动ID不能为空");
-        }
+        // 2. 活动ID查询（已在 DTO 层通过 @NotNull 校验）
         queryWrapper.eq("apply_id", queryDTO.getApplyId());
 
         // 3. 支付状态查询

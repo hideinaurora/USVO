@@ -16,6 +16,8 @@ import org.example.service.activity.refund.RefundService;
 import org.example.vo.activity.RefundDetailVO;
 import org.springframework.web.bind.annotation.*;
 
+import javax.validation.Valid;
+
 import javax.annotation.Resource;
 import java.util.List;
 
@@ -40,7 +42,7 @@ public class RefundController {
             })
     @PostMapping("/page")
     @RequiresPermissions(value = "refund:page", apiAuth = {ApiAuth.ADMIN})
-    public ApiResponse<PageResult<RefundDetailVO>> queryPage(@RequestBody RefundQueryDTO queryDTO) {
+    public ApiResponse<PageResult<RefundDetailVO>> queryPage(@Valid @RequestBody RefundQueryDTO queryDTO) {
         try {
             PageResult<RefundDetailVO> result = refundService.queryPage(queryDTO);
             return ApiResponse.success(result);
@@ -76,7 +78,7 @@ public class RefundController {
             })
     @PostMapping("/examine")
     @RequiresPermissions(value = "refund:examine", apiAuth = {ApiAuth.ADMIN})
-    public ApiResponse<Boolean> examine(@RequestBody RefundExamineDTO examineDTO) {
+    public ApiResponse<Boolean> examine(@Valid @RequestBody RefundExamineDTO examineDTO) {
         try {
             return ApiResponse.success(refundService.examine(examineDTO));
         } catch (CommonJsonException e) {

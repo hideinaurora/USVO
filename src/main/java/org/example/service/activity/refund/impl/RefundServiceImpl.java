@@ -227,24 +227,20 @@ public class RefundServiceImpl extends ServiceImpl<RefundMapper, RefundEntity> i
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Boolean examine(RefundExamineDTO examineDTO) {
-        // 1. 参数校验
-        if (examineDTO.getRefundId() == null) {
-            throw new CommonJsonException("退款申请ID不能为空");
-        }
-        if (examineDTO.getExamineType() == null) {
-            throw new CommonJsonException("审核类型不能为空");
-        }
-        if (examineDTO.getExamineType() != 1 && examineDTO.getExamineType() != 2) {
-            throw new CommonJsonException("审核类型只能为1（审核通过）或2（审核拒绝）");
-        }
+        // 参数已在 DTO 层通过 @NotNull 校验，这里省略简单校验
 
-        // 2. 查询退款申请
+        // 1. 查询退款申请
         RefundEntity refundEntity = getById(examineDTO.getRefundId());
         if (refundEntity == null) {
             throw new CommonJsonException("退款申请不存在");
         }
 
-        // 3. 检查退款申请状态
+        // 2. 校验审核类型（业务规则校验）
+        if (examineDTO.getExamineType() != 1 && examineDTO.getExamineType() != 2) {
+            throw new CommonJsonException("审核类型只能为1（审核通过）或2（审核拒绝）");
+        }
+
+        // 3. 检查退款申请状态（业务规则校验）
         if (refundEntity.getExamineType() != null && refundEntity.getExamineType() != 0) {
             String statusDesc = getExamineTypeDesc(refundEntity.getExamineType());
             throw new CommonJsonException("该退款申请已被" + statusDesc + "，无法再次审核");
@@ -257,11 +253,7 @@ public class RefundServiceImpl extends ServiceImpl<RefundMapper, RefundEntity> i
         RefundEntity updateEntity = new RefundEntity();
         updateEntity.setId(examineDTO.getRefundId());
         updateEntity.setExamineType(examineDTO.getExamineType());
-        boolean updateResult = updateById(updateEntity);
-
-        if (!updateResult) {
-            throw new CommonJsonException("更新退款申请状态失败");
-        }
+        updateById(updateEntity);
 
         // 6. 创建审核记录
         RefundExamineEntity examineEntity = new RefundExamineEntity();
@@ -269,11 +261,7 @@ public class RefundServiceImpl extends ServiceImpl<RefundMapper, RefundEntity> i
         examineEntity.setExamineType(examineDTO.getExamineType());
         examineEntity.setReason(examineDTO.getReason());
         examineEntity.setAdminId(adminId);
-        boolean saveResult = refundExamineService.save(examineEntity);
-
-        if (!saveResult) {
-            throw new CommonJsonException("创建审核记录失败");
-        }
+        refundExamineService.save(examineEntity);
 
         log.info("管理员审核退款申请成功，refundId={}, adminId={}, examineType={}",
                 examineDTO.getRefundId(), adminId, examineDTO.getExamineType());
