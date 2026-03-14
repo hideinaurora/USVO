@@ -33,4 +33,12 @@ public interface AdminService extends IService<AdminEntity> {
      * @return 验证码信息
      */
     CaptchaVO generateCaptcha();
+
+    /**
+     * 刷新令牌
+     *
+     * @param refreshToken 刷新令牌
+     * @return 新的登录响应信息（包含新的accessToken、refreshToken和expires）
+     */
+    LoginResponseVO refreshToken(String refreshToken);
 }

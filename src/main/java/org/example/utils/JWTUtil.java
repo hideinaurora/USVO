@@ -78,6 +78,28 @@ public class JWTUtil {
         return seed_claim.asString();
     }
 
+    /**
+     * 获取Token的过期时间
+     *
+     * @param token JWT Token
+     * @return 过期时间（Date格式）
+     */
+    public static Date getExpiresDate(String token) {
+        JWTVerifier verifier = JWT.require(Algorithm.HMAC256(secretKey)).build();
+        return verifier.verify(token).getExpiresAt();
+    }
+
+    /**
+     * 解析token获取过期时间
+     *
+     * @param token JWT Token
+     * @return 过期时间的时间戳（毫秒）
+     */
+    public static long getExpiresAt(String token) {
+        Date expiresDate = getExpiresDate(token);
+        return expiresDate != null ? expiresDate.getTime() : 0;
+    }
+
     public static void main(String[] args) {
         TokenDTO tokenDTO = new TokenDTO();
         tokenDTO.setAccountId(1L);

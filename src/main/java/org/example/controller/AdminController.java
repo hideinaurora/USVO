@@ -53,4 +53,18 @@ public class AdminController {
             throw new CommonJsonException("获取验证码失败");
         }
     }
+
+    @Operation(summary = "刷新令牌", description = "通过refreshToken获取新的accessToken和refreshToken，刷新成功后旧的refreshToken将失效")
+    @PostMapping("/refresh-token")
+    public ApiResponse<LoginResponseVO> refreshToken(@RequestParam String refreshToken) {
+        try {
+            LoginResponseVO response = adminService.refreshToken(refreshToken);
+            return ApiResponse.success(response);
+        } catch (CommonJsonException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("刷新令牌失败", e);
+            throw new CommonJsonException("刷新令牌失败，请稍后重试");
+        }
+    }
 }
