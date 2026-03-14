@@ -1,4 +1,5 @@
 package org.example.aop.filter;
+
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.Signature;
@@ -7,7 +8,7 @@ import org.aspectj.lang.annotation.Before;
 import org.aspectj.lang.reflect.MethodSignature;
 import org.example.aop.annotation.ApiAuth;
 import org.example.aop.annotation.RequiresPermissions;
-import org.example.config.exception.CommonJsonException;
+import org.example.config.exception.UnauthenticatedException;
 import org.example.config.exception.UnauthorizedException;
 import org.example.dto.TokenDTO;
 import org.example.utils.JWTUtil;
@@ -33,16 +34,13 @@ public class PermissionAspect {
     @Before("@annotation(org.example.aop.annotation.RequiresPermissions)")
     public void before(JoinPoint joinPoint) {
         log.debug("开始校验[操作权限]");
-        try {
-            String token = MDC.get("token");
-            TokenDTO tokenDTO = JWTUtil.verifyToken(token);
-            if (!hasPermission(joinPoint, tokenDTO)) {
-                throw new CommonJsonException("权限不符");
-            }
-        } catch (CommonJsonException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new UnauthorizedException();
+        String token = MDC.get("token");
+        if (token == null) {
+            throw new UnauthenticatedException();
+        }
+        TokenDTO tokenDTO = JWTUtil.verifyToken(token);
+        if (tokenDTO == null || !hasPermission(joinPoint, tokenDTO)) {
+            throw new UnauthenticatedException();
         }
     }
 

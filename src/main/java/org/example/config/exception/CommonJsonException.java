@@ -12,8 +12,6 @@ public class CommonJsonException extends RuntimeException {
     public CommonJsonException(String errorMessage) {
         this.resultJson = StringTools.getErrorReturn(errorMessage);
     }
-
-
     public CommonJsonException(OpResultDTO resultJson) {
         this.resultJson = resultJson;
     }
