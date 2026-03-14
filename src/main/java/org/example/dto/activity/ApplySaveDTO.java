@@ -1,5 +1,6 @@
 package org.example.dto.activity;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Getter;
 import lombok.Setter;
@@ -28,10 +29,12 @@ public class ApplySaveDTO {
 
     @Schema(description = "报名开始时间", example = "2026-03-15 09:00:00", required = true)
     @NotNull(message = "报名开始时间不能为空")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     private LocalDateTime applyStartTime;
 
     @Schema(description = "报名结束时间", example = "2026-03-20 18:00:00", required = true)
     @NotNull(message = "报名结束时间不能为空")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     private LocalDateTime applyEndTime;
 
     @Schema(description = "报名费用（分）", example = "9900", required = true)
