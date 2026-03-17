@@ -1,9 +1,11 @@
 package org.example.vo.activity;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
@@ -24,13 +26,18 @@ public class ApplyDetailVO {
     private String applyTitle;
 
     @Schema(description = "报名开始时间")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     private LocalDateTime applyStartTime;
 
     @Schema(description = "报名结束时间")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     private LocalDateTime applyEndTime;
 
     @Schema(description = "报名费用（分）")
     private Integer applyExpense;
+
+    @Schema(description = "报名费用（元）")
+    private BigDecimal applyExpenseY;
 
     @Schema(description = "活动详情")
     private String activeInfo;

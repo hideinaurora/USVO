@@ -29,6 +29,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -120,6 +122,7 @@ public class WebApplyServiceImpl implements WebApplyService {
     public Long add(ApplySaveDTO saveDTO) {
         ApplyEntity entity = new ApplyEntity();
         BeanUtils.copyProperties(saveDTO, entity);
+        entity.setApplyExpense(saveDTO.getApplyExpenseY().multiply(BigDecimal.valueOf(100)).intValue());
         applyService.save(entity);
         // 添加redis库存
         applyLockService.setInitialApply(entity.getApplyId(), saveDTO.getLimitNum().longValue());
@@ -134,6 +137,7 @@ public class WebApplyServiceImpl implements WebApplyService {
         }
         ApplyEntity entity = new ApplyEntity();
         BeanUtils.copyProperties(saveDTO, entity);
+        entity.setApplyExpense(saveDTO.getApplyExpenseY().multiply(BigDecimal.valueOf(100)).intValue());
         // 更新不支持修改限制人数
         entity.setLimitNum(null);
         return applyService.updateById(entity);
@@ -225,7 +229,7 @@ public class WebApplyServiceImpl implements WebApplyService {
         return entityList.stream().map(entity -> {
             ApplyDetailVO vo = new ApplyDetailVO();
             BeanUtils.copyProperties(entity, vo);
-
+            vo.setApplyExpenseY(BigDecimal.valueOf(entity.getApplyExpense()).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_DOWN));
             Long applyId = entity.getApplyId();
 
             // 报名成功人数
@@ -235,7 +239,6 @@ public class WebApplyServiceImpl implements WebApplyService {
             Integer totalAmount = payAmountMap.getOrDefault(applyId, 0);
             vo.setTotalPayAmount(totalAmount);
             vo.setTotalPayAmountYuan(totalAmount / 100.0);
-
             // 退款成功人数
             vo.setRefundSuccessCount(refundCountMap.getOrDefault(applyId, 0L).intValue());
 

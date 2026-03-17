@@ -47,7 +47,7 @@ public class IdempotentAspect {
         HttpServletRequest request = attributes.getRequest();
 
         // 2. 获取Token
-        String token = request.getHeader("token");
+        String token = request.getHeader("Authorization");
         if (token == null || token.isEmpty()) {
             throw new CommonJsonException("请先登录");
         }

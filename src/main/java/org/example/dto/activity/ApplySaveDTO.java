@@ -7,6 +7,7 @@ import lombok.Setter;
 
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
@@ -39,7 +40,7 @@ public class ApplySaveDTO {
 
     @Schema(description = "报名费用（分）", example = "9900", required = true)
     @NotNull(message = "报名费用不能为空")
-    private Integer applyExpense;
+    private BigDecimal applyExpenseY;
 
     @Schema(description = "活动详情", example = "本次活动旨在...")
     private String activeInfo;
