@@ -48,7 +48,7 @@ public class ApplyLockService {
                     atomicLong.set(newStock);
 
                     // 更新数据库
-                    ApplyEntity entity = new ApplyEntity();
+                    ApplyEntity entity = service.getById(batchId);
                     entity.setLimitNum((int) (entity.getLimitNum() + quantity));
                     entity.setApplyId(batchId);
                     entity.setRemainingQuota((int) newStock);
@@ -103,7 +103,7 @@ public class ApplyLockService {
                     atomicLong.set(newStock);
 
                     // 更新数据库
-                    ApplyEntity entity = new ApplyEntity();
+                    ApplyEntity entity = service.getById(batchId);
                     entity.setApplyId(batchId);
                     entity.setLimitNum((int) (entity.getLimitNum() - quantity));
                     entity.setRemainingQuota((int) newStock);

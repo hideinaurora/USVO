@@ -10,6 +10,7 @@ import org.example.aop.annotation.RequiresPermissions;
 import org.example.common.ApiResponse;
 import org.example.common.PageResult;
 import org.example.config.exception.CommonJsonException;
+import org.example.dto.ApplyQuotaDTO;
 import org.example.dto.activity.ApplyQueryDTO;
 import org.example.dto.activity.ApplySaveDTO;
 import org.example.dto.activity.ApplyUserQueryDTO;
@@ -198,26 +199,24 @@ public class ApplyController {
             })
     @PutMapping("/quota/increase")
     @RequiresPermissions(value = "apply:quota:update", apiAuth = {ApiAuth.ADMIN})
-    public ApiResponse<Void> increaseQuota(
-            @Parameter(description = "活动ID", required = true) @RequestParam Long applyId,
-            @Parameter(description = "增加的名额数量", required = true) @RequestParam Long quantity) {
+    public ApiResponse<Void> increaseQuota(@Valid @RequestBody ApplyQuotaDTO dto) {
         try {
-            if (quantity <= 0) {
+            if (dto.getQuantity() <= 0) {
                 return ApiResponse.error("增加数量必须大于0");
             }
             // 校验活动是否存在
-            ApplyDetailVO applyDetail = applyService.queryDetail(applyId);
+            ApplyDetailVO applyDetail = applyService.queryDetail(dto.getApplyId());
             if (applyDetail == null) {
                 return ApiResponse.error("活动不存在");
             }
-            boolean result = applyLockService.increaseApply(applyId, quantity);
+            boolean result = applyLockService.increaseApply(dto.getApplyId(), dto.getQuantity());
             if (result) {
                 return ApiResponse.success();
             } else {
                 return ApiResponse.error("增加名额失败，请稍后重试");
             }
         } catch (Exception e) {
-            log.error("增加活动名额失败，applyId={}, quantity={}", applyId, quantity, e);
+            log.error("增加活动名额失败，applyId={}, quantity={}", dto.getApplyId(), dto.getQuantity(), e);
             throw new CommonJsonException("增加活动名额失败");
         }
     }
@@ -228,26 +227,24 @@ public class ApplyController {
             })
     @PutMapping("/quota/decrease")
     @RequiresPermissions(value = "apply:quota:update", apiAuth = {ApiAuth.ADMIN})
-    public ApiResponse<Void> decreaseQuota(
-            @Parameter(description = "活动ID", required = true) @RequestParam Long applyId,
-            @Parameter(description = "减少的名额数量", required = true) @RequestParam Long quantity) {
+    public ApiResponse<Void> decreaseQuota(@Valid @RequestBody ApplyQuotaDTO dto) {
         try {
-            if (quantity <= 0) {
+            if (dto.getQuantity() <= 0) {
                 return ApiResponse.error("减少数量必须大于0");
             }
             // 校验活动是否存在
-            ApplyDetailVO applyDetail = applyService.queryDetail(applyId);
+            ApplyDetailVO applyDetail = applyService.queryDetail(dto.getApplyId());
             if (applyDetail == null) {
                 return ApiResponse.error("活动不存在");
             }
-            boolean result = applyLockService.decreaseApply(applyId, quantity);
+            boolean result = applyLockService.decreaseApply(dto.getApplyId(), dto.getQuantity());
             if (result) {
                 return ApiResponse.success();
             } else {
                 return ApiResponse.error("减少名额失败，名额不足或操作失败");
             }
         } catch (Exception e) {
-            log.error("减少活动名额失败，applyId={}, quantity={}", applyId, quantity, e);
+            log.error("减少活动名额失败，applyId={}, quantity={}", dto.getApplyId(), dto.getQuantity(), e);
             throw new CommonJsonException("减少活动名额失败");
         }
     }

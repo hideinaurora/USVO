@@ -115,7 +115,7 @@ public class AdminServiceImpl extends ServiceImpl<AdminMapper, AdminEntity> impl
         response.setExpires(expires);
         response.setUserId(admin.getId());
         response.setUserName(admin.getLoginName());
-        response.setRoles(Collections.singletonList("管理员"));
+        response.setRoles(Collections.singletonList("admin"));
 
         log.info("管理员登录成功: {}", admin.getLoginName());
         return response;
@@ -194,7 +194,7 @@ public class AdminServiceImpl extends ServiceImpl<AdminMapper, AdminEntity> impl
         response.setExpires(expires);
         response.setUserId(admin.getId());
         response.setUserName(admin.getLoginName());
-        response.setRoles(Collections.singletonList("管理员"));
+        response.setRoles(Collections.singletonList("admin"));
 
         log.info("管理员刷新令牌成功: {}", admin.getLoginName());
         return response;

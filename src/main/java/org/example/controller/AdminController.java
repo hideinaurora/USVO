@@ -1,5 +1,6 @@
 package org.example.controller;
 
+import com.alibaba.fastjson2.JSONObject;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
@@ -7,11 +8,13 @@ import org.example.common.ApiResponse;
 import org.example.config.exception.CommonJsonException;
 import org.example.dto.LoginRequestDTO;
 import org.example.service.sys.admin.AdminService;
+import org.example.utils.exception.CommonUtil;
 import org.example.vo.CaptchaVO;
 import org.example.vo.LoginResponseVO;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
 
 /**
  * 管理端用户控制器
@@ -56,8 +59,10 @@ public class AdminController {
 
     @Operation(summary = "刷新令牌", description = "通过refreshToken获取新的accessToken和refreshToken，刷新成功后旧的refreshToken将失效")
     @PostMapping("/refresh-token")
-    public ApiResponse<LoginResponseVO> refreshToken(@RequestParam String refreshToken) {
+    public ApiResponse<LoginResponseVO> refreshToken(HttpServletRequest request) {
         try {
+            JSONObject param = CommonUtil.getJsonObject(request);
+            String refreshToken = param.getString("refreshToken");
             LoginResponseVO response = adminService.refreshToken(refreshToken);
             return ApiResponse.success(response);
         } catch (CommonJsonException e) {
