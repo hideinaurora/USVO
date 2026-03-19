@@ -189,3 +189,7 @@ CREATE TABLE `sys_admin`  (
 ) ENGINE = InnoDB AUTO_INCREMENT = 2 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '系统用户表' ROW_FORMAT = Dynamic;
 
 SET FOREIGN_KEY_CHECKS = 1;
+
+
+-- 插入管理员用户，密码是D5a!rX&8upsQ*x
+INSERT INTO `nblg_apply`.`sys_admin` (`id`, `login_name`, `login_password`, `user_status`, `is_deleted`, `gmt_create`, `gmt_modify`) VALUES (1, 'admin', '5c43dfbba6de1ea2721273dede9412a0', 1, 0, '2026-03-13 11:32:56', '2026-03-14 16:58:38');
