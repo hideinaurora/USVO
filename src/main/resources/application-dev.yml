@@ -4,10 +4,10 @@ server:
 spring:
   # RabbitMQ配置
   rabbitmq:
-    host: 192.168.10.141
+    host: localhost
     port: 5672
-    username: admin
-    password: ibdw@123
+    username: 张开
+    password: 123123
     # 虚拟主机（默认为/）
     virtual-host: /
 
@@ -54,9 +54,9 @@ spring:
       max-request-size: 5MB
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://192.168.10.141:33068/nblg_apply?allowPublicKeyRetrieval=true&allowMultiQueries=true&useUnicode=true&characterEncoding=UTF-8&useSSL=false
+    url: jdbc:mysql://127.0.0.1:3306/nblg_apply
     username: root
-    password: ibdw@1608
+    password: zhangk1103
     maxActive: 4
     initialSize: 1
     maxWait: 60000
@@ -77,7 +77,8 @@ logging:
   level:
     org.example.controller: info
   config: classpath:logback-spring.xml
-  path: ./logs
+  file:
+    path: ./logs
 
 mybatis-plus:
   global-config:
