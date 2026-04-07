@@ -2,6 +2,7 @@ package org.example.service.venue.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import org.apache.commons.lang3.StringUtils;
+import org.example.common.PageResult;
 import org.example.entity.CourtEntity;
 import org.example.entity.VenueEntity;
 import org.example.mapper.venue.CourtMapper;
@@ -31,33 +32,12 @@ public class VenueServiceImpl implements VenueService {
 
     @Override
     public List<VenueListVO> listVenues(String type, String keyword, Double latitude, Double longitude) {
-        QueryWrapper<VenueEntity> wrapper = new QueryWrapper<>();
-        wrapper.eq("status", 1);
-        if (StringUtils.isNotBlank(type)) {
-            wrapper.eq("type", type);
-        }
-        if (StringUtils.isNotBlank(keyword)) {
-            wrapper.and(w -> w.like("name", keyword).or().like("address", keyword));
-        }
-        wrapper.orderByAsc("id");
-
-        List<VenueEntity> venues = venueMapper.selectList(wrapper);
+        List<VenueEntity> venues = queryVenueEntities(type, keyword);
         if (venues == null || venues.isEmpty()) {
             return Collections.emptyList();
         }
 
-        List<Long> venueIds = venues.stream().map(VenueEntity::getId).filter(Objects::nonNull).collect(Collectors.toList());
-        Map<Long, Long> courtCountMap = new HashMap<>();
-        if (!venueIds.isEmpty()) {
-            List<VenueCourtCountVO> counts = courtMapper.selectVenueCourtCounts(venueIds);
-            if (counts != null) {
-                for (VenueCourtCountVO c : counts) {
-                    if (c.getVenueId() != null) {
-                        courtCountMap.put(c.getVenueId(), c.getCourtCount() == null ? 0L : c.getCourtCount());
-                    }
-                }
-            }
-        }
+        Map<Long, Long> courtCountMap = getCourtCountMap(venues);
 
         // 计算距离
         boolean hasLocation = latitude != null && longitude != null;
@@ -78,6 +58,24 @@ public class VenueServiceImpl implements VenueService {
             list.sort(Comparator.comparing(VenueListVO::getDistance, Comparator.nullsLast(Double::compareTo)));
         }
         return list;
+    }
+
+    @Override
+    public PageResult<VenueListVO> pageVenues(Integer pageNum, Integer pageSize, String type, String keyword, Double latitude, Double longitude) {
+        int pNum = (pageNum == null || pageNum <= 0) ? 1 : pageNum;
+        int pSize = (pageSize == null || pageSize <= 0) ? 10 : pageSize;
+
+        // 为了支持“按距离排序 + 正确分页”，这里先取全量结果做排序再截断分页
+        List<VenueListVO> all = listVenues(type, keyword, latitude, longitude);
+        if (all.isEmpty()) {
+            return PageResult.of(pNum, pSize, 0L, Collections.emptyList());
+        }
+
+        long total = all.size();
+        int fromIndex = Math.min((pNum - 1) * pSize, all.size());
+        int toIndex = Math.min(fromIndex + pSize, all.size());
+        List<VenueListVO> pageRecords = fromIndex >= toIndex ? Collections.emptyList() : all.subList(fromIndex, toIndex);
+        return PageResult.of(pNum, pSize, total, pageRecords);
     }
 
     @Override
@@ -113,6 +111,37 @@ public class VenueServiceImpl implements VenueService {
         }).collect(Collectors.toList());
         vo.setCourts(courtVos);
         return vo;
+    }
+
+    private List<VenueEntity> queryVenueEntities(String type, String keyword) {
+        QueryWrapper<VenueEntity> wrapper = new QueryWrapper<>();
+        wrapper.eq("status", 1);
+        if (StringUtils.isNotBlank(type)) {
+            wrapper.eq("type", type);
+        }
+        if (StringUtils.isNotBlank(keyword)) {
+            wrapper.and(w -> w.like("name", keyword).or().like("address", keyword));
+        }
+        wrapper.orderByAsc("id");
+        return venueMapper.selectList(wrapper);
+    }
+
+    private Map<Long, Long> getCourtCountMap(List<VenueEntity> venues) {
+        List<Long> venueIds = venues.stream().map(VenueEntity::getId).filter(Objects::nonNull).collect(Collectors.toList());
+        if (venueIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        List<VenueCourtCountVO> counts = courtMapper.selectVenueCourtCounts(venueIds);
+        if (counts == null || counts.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<Long, Long> courtCountMap = new HashMap<>();
+        for (VenueCourtCountVO c : counts) {
+            if (c.getVenueId() != null) {
+                courtCountMap.put(c.getVenueId(), c.getCourtCount() == null ? 0L : c.getCourtCount());
+            }
+        }
+        return courtCountMap;
     }
 
     /**

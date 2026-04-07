@@ -23,9 +23,12 @@
 2.1 获取场馆列表接口路径: GET /venue/list
 请求参数:参数 类型 必填 说明type string 否 场馆类型 (basketball/badminton/swimming)keyword string 否 搜索关键词 (名称 / 地址)latitude decimal 否 纬度 (距离排序用)longitude decimal 否 经度 (距离排序用)
 响应示例:{"code": 200,"data": [{"id": 1,"name": "南校区体育中心","type": "综合馆","address": "南校区体育路 1 号","latitude": 31.2304,"longitude": 121.4737,"open_time": "08:00:00","close_time": "22:00:00","distance": null,"court_count": 3},{"id": 2,"name": "北校区篮球馆","type": "篮球馆","address": "北校区体育路 2 号","latitude": 31.2310,"longitude": 121.4740,"open_time": "08:00:00","close_time": "22:00:00","distance": 0.12,"court_count": 2}]}
-2.2 获取场馆详情接口路径: GET /venue/{venueId}
+2.2 获取场馆分页列表接口路径: GET /venue/page
+请求参数:参数 类型 必填 说明pageNum int 否 页码，默认 1pageSize int 否 每页条数，默认 10type string 否 场馆类型 (basketball/badminton/swimming)keyword string 否 搜索关键词 (名称 / 地址)latitude decimal 否 纬度 (距离排序用)longitude decimal 否 经度 (距离排序用)
+响应示例:{"code": 200,"data": {"pageNum": 1,"pageSize": 10,"total": 2,"totalPages": 1,"records": [{"id": 1,"name": "南校区体育中心","type": "综合馆","address": "南校区体育路 1 号","latitude": 31.2304,"longitude": 121.4737,"openTime": "08:00:00","closeTime": "22:00:00","distance": null,"courtCount": 3},{"id": 2,"name": "北校区篮球馆","type": "篮球馆","address": "北校区体育路 2 号","latitude": 31.2310,"longitude": 121.4740,"openTime": "08:00:00","closeTime": "22:00:00","distance": 0.12,"courtCount": 2}]}}
+2.3 获取场馆详情接口路径: GET /venue/{venueId}
 响应示例:{"code": 200,"data": {"id": 1,"name": "南校区体育中心","type": "综合馆","address": "南校区体育路 1 号","latitude": 31.2304,"longitude": 121.4737,"open_time": "08:00:00","close_time": "22:00:00","status": 1,"courts": [{"id": 1,"name": "篮球场 1 号","type": "basketball","price_per_hour": 50.00},{"id": 2,"name": "篮球场 2 号","type": "basketball","price_per_hour": 50.00},{"id": 3,"name": "羽毛球场 1 号","type": "badminton","price_per_hour": 30.00}]}}
-2.3 获取可预约时间片接口路径: GET /court/{courtId}/slots
+2.4 获取可预约时间片接口路径: GET /court/{courtId}/slots
 请求参数:参数 类型 必填 说明date string 是 日期 (YYYY-MM-DD)
 响应示例:{"code": 200,"data": {"court_id": 1,"court_name": "篮球场 1 号","price_per_hour": 50.00,"date": "2026-04-03","slots": [{"id": 1,"start_time": "10:00:00","end_time": "11:00:00","status": 2,"status_text": "已预约"},{"id": 2,"start_time": "11:00:00","end_time": "12:00:00","status": 0,"status_text": "可预约"},{"id": 3,"start_time": "12:00:00","end_time": "13:00:00","status": 0,"status_text": "可预约"}]}}
 ================================================================================三、预约模块================================================================================
