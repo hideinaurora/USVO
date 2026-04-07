@@ -56,6 +56,17 @@ public class RequestFilter extends OncePerRequestFilter implements Filter {
     private void setToken(HttpServletRequest request) {
         //通过token解析出username
         String token = request.getHeader("Authorization");
+        if (StringTools.isNullOrEmpty(token)) {
+            // 兼容部分客户端用自定义header传token
+            token = request.getHeader("token");
+        }
+        if (StringTools.isNullOrEmpty(token)) {
+            return;
+        }
+        // 兼容 Authorization: Bearer <token>
+        if (token.startsWith("Bearer ")) {
+            token = token.substring("Bearer ".length()).trim();
+        }
         if (!StringTools.isNullOrEmpty(token)) {
             MDC.put("token", token);
         }

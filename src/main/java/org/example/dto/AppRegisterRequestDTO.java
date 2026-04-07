@@ -26,4 +26,8 @@ public class AppRegisterRequestDTO {
 
     @Schema(description = "微信ID（可选）", example = "wx_openid_123456")
     private String wxId;
+
+    @Schema(description = "手机号（可选）", example = "13800000000")
+    private String phone;
+
 }

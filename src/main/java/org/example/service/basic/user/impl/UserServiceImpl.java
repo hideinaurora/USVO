@@ -19,8 +19,7 @@ import org.springframework.util.DigestUtils;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 
 import javax.annotation.Resource;
-import java.util.Date;
-import java.util.List;
+import java.time.LocalDateTime;
 
 /**
  * <p>
@@ -66,6 +65,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
         user.setLoginName(registerRequest.getLoginName());
         user.setLoginPassword(encryptedPassword);
         user.setUserName(registerRequest.getUserName());
+        user.setPhone(registerRequest.getPhone());
         user.setUserStatus(1); // 默认正常状态
         user.setIsDeleted(0); // 未删除
         if (registerRequest.getWxId() != null) {
@@ -132,6 +132,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
         tokenData.put("accountId", user.getId());
         tokenData.put("roleId", 2); // 移动端用户角色ID
         String token = org.example.utils.JWTUtil.createSign(tokenData.toString(), TOKEN_EXPIRE_MINUTES);
+        log.info("Token: {}", token);
 
         // 6. 构建响应
         AppLoginResponseVO response = new AppLoginResponseVO();
@@ -140,6 +141,15 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
         response.setLoginName(user.getLoginName());
         response.setUserName(user.getUserName());
         response.setRoleId(2); // 移动端用户角色ID
+
+        // 7. 更新最近登录时间（不影响主流程）
+        try {
+            UserEntity update = new UserEntity();
+            update.setId(user.getId());
+            update.setLastLoginTime(LocalDateTime.now());
+            updateById(update);
+        } catch (Exception ignore) {
+        }
 
         log.info("移动端用户登录成功: {}", user.getLoginName());
         return response;
@@ -179,6 +189,15 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
         response.setLoginName(user.getLoginName());
         response.setUserName(user.getUserName());
         response.setRoleId(2); // 移动端用户角色ID
+
+        // 6. 更新最近登录时间（不影响主流程）
+        try {
+            UserEntity update = new UserEntity();
+            update.setId(user.getId());
+            update.setLastLoginTime(LocalDateTime.now());
+            updateById(update);
+        } catch (Exception ignore) {
+        }
 
         log.info("微信小程序登录成功: userId={}, wxId={}", user.getId(), wxId);
         return response;

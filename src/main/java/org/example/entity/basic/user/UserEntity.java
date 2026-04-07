@@ -76,5 +76,24 @@ public class UserEntity implements Serializable {
     @TableField(value = "wx_id")
     private String wxId;
 
+    /**
+     * 最近登录时间（可为空）
+     */
+    @TableField(value = "last_login_time")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    private LocalDateTime lastLoginTime;
+
+
+    @TableField(value = "phone")
+    private String phone;
+
+    @TableField(value = "violation_count")
+    private Integer violationCount;
+
+    @TableField(value = "credit_score")
+    private Integer creditScore;
+
+
+
 
 }
