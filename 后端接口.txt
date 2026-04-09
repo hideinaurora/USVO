@@ -28,29 +28,29 @@
 响应示例:{"code": 200,"data": {"pageNum": 1,"pageSize": 10,"total": 2,"totalPages": 1,"records": [{"id": 1,"name": "南校区体育中心","type": "综合馆","address": "南校区体育路 1 号","latitude": 31.2304,"longitude": 121.4737,"openTime": "08:00:00","closeTime": "22:00:00","distance": null,"courtCount": 3},{"id": 2,"name": "北校区篮球馆","type": "篮球馆","address": "北校区体育路 2 号","latitude": 31.2310,"longitude": 121.4740,"openTime": "08:00:00","closeTime": "22:00:00","distance": 0.12,"courtCount": 2}]}}
 2.3 获取场馆详情接口路径: GET /venue/{venueId}
 响应示例:{"code": 200,"data": {"id": 1,"name": "南校区体育中心","type": "综合馆","address": "南校区体育路 1 号","latitude": 31.2304,"longitude": 121.4737,"open_time": "08:00:00","close_time": "22:00:00","status": 1,"courts": [{"id": 1,"name": "篮球场 1 号","type": "basketball","price_per_hour": 50.00},{"id": 2,"name": "篮球场 2 号","type": "basketball","price_per_hour": 50.00},{"id": 3,"name": "羽毛球场 1 号","type": "badminton","price_per_hour": 30.00}]}}
-2.4 获取可预约时间片接口路径: GET /court/{courtId}/slots
+2.4 获取可预约时间片接口路径: GET /api/court/{courtId}/slots
 请求参数:参数 类型 必填 说明date string 是 日期 (YYYY-MM-DD)
 响应示例:{"code": 200,"data": {"court_id": 1,"court_name": "篮球场 1 号","price_per_hour": 50.00,"date": "2026-04-03","slots": [{"id": 1,"start_time": "10:00:00","end_time": "11:00:00","status": 2,"status_text": "已预约"},{"id": 2,"start_time": "11:00:00","end_time": "12:00:00","status": 0,"status_text": "可预约"},{"id": 3,"start_time": "12:00:00","end_time": "13:00:00","status": 0,"status_text": "可预约"}]}}
 ================================================================================三、预约模块================================================================================
-3.1 创建预约 (核心 - 悲观锁)接口路径: POST /booking/create请求头: Authorization: Bearer {token}
-请求参数:{"court_id": 1,"slot_id": 2,"start_time": "2026-04-03 11:00:00","end_time": "2026-04-03 12:00:00"}
+3.1 创建预约接口路径: POST /api/booking/create请求头: Authorization: Bearer {token}说明: 当前实现为事务内校验+更新时间片，未接悲观锁与超时取消MQ
+请求参数:{"court_id": 1,"slot_id": 2}
 响应示例 (成功):{"code": 200,"message": "预约创建成功，请支付押金","data": {"booking_id": 1003,"court_name": "篮球场 1 号","start_time": "2026-04-03 11:00:00","end_time": "2026-04-03 12:00:00","total_amount": 50.00,"deposit_amount": 20.00,"status": 0,"expire_time": "2026-04-03 11:15:00"}}
 响应示例 (冲突):{"code": 409,"message": "该时间段已被预约，请重新选择"}
-3.2 支付押金接口路径: POST /payment/pay请求头: Authorization: Bearer {token}
+3.2 支付押金接口路径: POST /api/payment/pay请求头: Authorization: Bearer {token}说明: 模拟支付成功落库，非第三方支付回调
 请求参数:{"booking_id": 1003,"pay_type": "wechat"}
 响应示例:{"code": 200,"message": "支付成功","data": {"payment_id": 2001,"booking_id": 1003,"amount": 20.00,"status": 1,"transaction_no": "TXN202604030001"}}
-3.3 取消预约 (触发延迟退款)接口路径: POST /booking/cancel请求头: Authorization: Bearer {token}
+3.3 取消预约接口路径: POST /api/booking/cancel请求头: Authorization: Bearer {token}说明: 已支付时直接将支付置为已退款并释放时间片，未接延迟退款MQ
 请求参数:{"booking_id": 1003}
 响应示例:{"code": 200,"message": "取消成功，押金将退回原账户"}
-3.4 获取我的预约记录接口路径: GET /booking/list请求头: Authorization: Bearer {token}
+3.4 获取我的预约记录接口路径: GET /api/booking/list请求头: Authorization: Bearer {token}
 请求参数:参数 类型 必填 说明status int 否 状态 (0 待支付 1 已预约 2 已取消 3 已完成 4 违约)page int 否 页码，默认 1size int 否 每页条数，默认 10
-响应示例:{"code": 200,"data": {"total": 2,"page": 1,"size": 10,"list": [{"id": 1001,"court_name": "篮球场 1 号","venue_name": "南校区体育中心","start_time": "2026-04-03 10:00:00","end_time": "2026-04-03 11:00:00","total_amount": 50.00,"deposit_amount": 20.00,"status": 1,"status_text": "已预约","cancel_time": null,"checkin_time": null,"create_time": "2026-04-01 10:00:00"}]}}
-3.5 获取预约详情接口路径: GET /booking/{bookingId}请求头: Authorization: Bearer {token}
+响应示例:{"code": 200,"data": {"pageNum": 1,"pageSize": 10,"total": 2,"totalPages": 1,"records": [{"id": 1001,"courtName": "篮球场 1 号","venueName": "南校区体育中心","startTime": "2026-04-03 10:00:00","endTime": "2026-04-03 11:00:00","totalAmount": 50.00,"depositAmount": 20.00,"status": 1,"statusText": "已预约","cancelTime": null,"checkinTime": null,"createTime": "2026-04-01 10:00:00"}]}}
+3.5 获取预约详情接口路径: GET /api/booking/{bookingId}请求头: Authorization: Bearer {token}
 响应示例:{"code": 200,"data": {"id": 1001,"user_id": 1,"username": "zhangsan","court_id": 1,"court_name": "篮球场 1 号","venue_name": "南校区体育中心","start_time": "2026-04-03 10:00:00","end_time": "2026-04-03 11:00:00","total_amount": 50.00,"deposit_amount": 20.00,"status": 1,"cancel_time": null,"checkin_time": null,"create_time": "2026-04-01 10:00:00","payment": {"id": 1001,"amount": 20.00,"pay_type": "wechat","status": 1,"transaction_no": "TXN202604010001"}}}
-3.6 签到入场接口路径: POST /booking/checkin请求头: Authorization: Bearer {token}
+3.6 签到入场接口路径: POST /api/booking/checkin请求头: Authorization: Bearer {token}
 请求参数:{"booking_id": 1001,"checkin_type": "扫码","device_id": "DEV001"}
 响应示例:{"code": 200,"message": "签到成功，祝您运动愉快"}
-3.7 获取可预约时间 (批量查询)接口路径: GET /court/available-slots
+3.7 获取可预约时间 (批量查询)接口路径: GET /api/court/available-slots
 请求参数:参数 类型 必填 说明court_id long 是 场地 IDdate string 是 日期 (YYYY-MM-DD)start_time string 否 开始时间 (HH:MM:SS)end_time string 否 结束时间 (HH:MM:SS)
 响应示例:{"code": 200,"data": [{"slot_id": 2,"start_time": "11:00:00","end_time": "12:00:00","is_available": true,"price": 50.00},{"slot_id": 3,"start_time": "12:00:00","end_time": "13:00:00","is_available": true,"price": 50.00}]}
 ================================================================================四、管理后台模块================================================================================
