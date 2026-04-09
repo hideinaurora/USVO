@@ -91,21 +91,21 @@ public class AppController {
         }
     }
 
-    @Operation(summary = "微信登录", description = "通过微信小程序code进行登录，返回JWT令牌")
-    @PostMapping("/wx-login")
-    public ApiResponse<AppLoginResponseVO> wxLogin(@Valid @RequestBody AppWxLoginRequestDTO request) {
-        try {
-            String openId = wxUtils.queryMiniOpenId(request.getCode());
-            log.info("获取微信openId成功: openId={}", openId);
-            AppLoginResponseVO response = userService.wxLogin(openId);
-            return ApiResponse.success(response);
-        } catch (CommonJsonException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("微信登录失败", e);
-            throw new CommonJsonException("微信登录失败，请稍后重试");
-        }
-    }
+//    @Operation(summary = "微信登录", description = "通过微信小程序code进行登录，返回JWT令牌")
+//    @PostMapping("/wx-login")
+//    public ApiResponse<AppLoginResponseVO> wxLogin(@Valid @RequestBody AppWxLoginRequestDTO request) {
+//        try {
+//            String openId = wxUtils.queryMiniOpenId(request.getCode());
+//            log.info("获取微信openId成功: openId={}", openId);
+//            AppLoginResponseVO response = userService.wxLogin(openId);
+//            return ApiResponse.success(response);
+//        } catch (CommonJsonException e) {
+//            throw e;
+//        } catch (Exception e) {
+//            log.error("微信登录失败", e);
+//            throw new CommonJsonException("微信登录失败，请稍后重试");
+//        }
+//    }
 
     @Operation(summary = "获取用户信息", description = "获取当前登录用户的基础信息",
             parameters = {
