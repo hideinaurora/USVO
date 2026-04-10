@@ -3,7 +3,9 @@ package org.example.service.basic.user.impl;
 
 import com.alibaba.fastjson2.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.example.config.exception.CommonJsonException;
 import org.example.dto.AppLoginRequestDTO;
 import org.example.dto.AppRegisterRequestDTO;
@@ -12,6 +14,7 @@ import org.example.mapper.basic.user.UserMapper;
 import org.example.service.basic.user.UserService;
 import org.example.utils.StringTools;
 import org.example.vo.AppLoginResponseVO;
+import org.example.vo.admin.UserListItemVO;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +23,11 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 
 import javax.annotation.Resource;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * <p>
@@ -201,5 +209,92 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
 
         log.info("微信小程序登录成功: userId={}, wxId={}", user.getId(), wxId);
         return response;
+    }
+
+    @Override
+    public Map<String, Object> getUserPageList(String keyword, Integer status, Integer page, Integer size) {
+        int pageNum = (page == null || page <= 0) ? 1 : page;
+        int pageSize = (size == null || size <= 0) ? 10 : size;
+
+        Page<UserEntity> pageParam = new Page<>(pageNum, pageSize);
+        QueryWrapper<UserEntity> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("is_deleted", 0);
+
+        if (StringUtils.isNotBlank(keyword)) {
+            queryWrapper.and(w -> w.like("user_name", keyword).or().like("phone", keyword));
+        }
+        if (status != null) {
+            queryWrapper.eq("user_status", status);
+        }
+        queryWrapper.orderByDesc("id");
+
+        Page<UserEntity> result = page(pageParam, queryWrapper);
+        List<UserEntity> records = result.getRecords();
+
+        List<UserListItemVO> list = records.stream().map(user -> {
+            UserListItemVO vo = new UserListItemVO();
+            vo.setId(user.getId());
+            vo.setUsername(user.getUserName());
+            vo.setPhone(user.getPhone());
+            vo.setViolationCount(user.getViolationCount() != null ? user.getViolationCount() : 0);
+            vo.setCreditScore(user.getCreditScore() != null ? user.getCreditScore() : 100);
+            vo.setStatus(user.getUserStatus());
+            if (user.getGmtModify() != null) {
+                vo.setCreateTime(user.getGmtModify().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+            } else {
+                vo.setCreateTime(null);
+            }
+            return vo;
+        }).collect(Collectors.toList());
+
+        Map<String, Object> resultMap = new HashMap<>();
+        resultMap.put("total", result.getTotal());
+        resultMap.put("page", pageNum);
+        resultMap.put("size", pageSize);
+        resultMap.put("list", list);
+        return resultMap;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteUser(Long userId) {
+        if (userId == null) {
+            throw new CommonJsonException("用户ID不能为空");
+        }
+        UserEntity user = getById(userId);
+        if (user == null) {
+            throw new CommonJsonException("用户不存在");
+        }
+        if (user.getIsDeleted() != null && user.getIsDeleted() == 1) {
+            throw new CommonJsonException("用户已删除");
+        }
+        baseMapper.update(null,
+                new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<UserEntity>()
+                        .eq(UserEntity::getId, userId)
+                        .set(UserEntity::getIsDeleted, 1));
+        log.info("管理员删除用户: userId={}", userId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateUserStatus(Long userId, Integer status) {
+        if (userId == null) {
+            throw new CommonJsonException("用户ID不能为空");
+        }
+        if (status == null || (status != 1 && status != 0)) {
+            throw new CommonJsonException("状态值不合法");
+        }
+        UserEntity user = getById(userId);
+        if (user == null) {
+            throw new CommonJsonException("用户不存在");
+        }
+        if (user.getIsDeleted() != null && user.getIsDeleted() == 1) {
+            throw new CommonJsonException("用户已删除");
+        }
+        baseMapper.update(null,
+                new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<UserEntity>()
+                        .eq(UserEntity::getId, userId)
+                        .set(UserEntity::getUserStatus, status));
+        log.info("管理员更新用户状态: userId={}, status={}", userId, status);
     }
 }
