@@ -1,0 +1,198 @@
+时间片管理接口文档（txt版）
+新时间片管理接口（2026-04-11）
+文档说明
+本文档为时间片管理模块新增接口说明，所有管理接口均需要管理员权限，请求头需携带有效 Token。
+基础信息
+Base URL：http://localhost:8080/api
+请求头：Authorization: Bearer {token}
+权限要求：所有接口需要管理员权限
+一、生成时间片
+接口路径：POST /admin/timeslot/generate
+请求方式：POST
+请求参数
+参数名        类型        必填        说明
+court_id        long        是        场地 ID
+start_date        string        是        开始日期（格式：YYYY-MM-DD）
+end_date        string        是        结束日期（格式：YYYY-MM-DD）
+slot_duration_minutes        int        否        时间段粒度（分钟），默认 60
+ignore_existing        boolean        否        是否忽略已存在的时间片，默认 false
+请求示例
+{
+    "court_id": 1,
+    "start_date": "2026-04-11",
+    "end_date": "2026-04-18",
+    "slot_duration_minutes": 60,
+    "ignore_existing": false
+}
+响应示例
+{
+    "code": 200,
+    "message": "生成成功",
+    "data": {
+        "court_id": 1,
+        "court_name": "篮球场1号",
+        "venue_name": "南校区体育中心",
+        "date_range": {
+            "start_date": "2026-04-11",
+            "end_date": "2026-04-18"
+        },
+        "total_generated": 56,
+        "skipped": 0,
+        "slots": [
+            {
+                "id": 1001,
+                "slot_date": "2026-04-11",
+                "start_time": "2026-04-11 08:00:00",
+                "end_time": "2026-04-11 09:00:00",
+                "status": 0
+            }
+        ]
+    }
+}
+二、时间片列表查询
+接口路径：GET /admin/timeslot/list
+请求方式：GET
+请求参数
+参数名        类型        必填        说明
+court_id        long        否        场地 ID
+venue_id        long        否        场馆 ID（联查）
+start_date        string        否        开始日期（YYYY-MM-DD）
+end_date        string        否        结束日期（YYYY-MM-DD）
+status        int        否        0 可预约 1 锁定中 2 已预约
+page        int        否        页码，默认 1
+size        int        否        每页条数，默认 20
+响应示例
+{
+    "code": 200,
+    "data": {
+        "total": 168,
+        "page": 1,
+        "size": 20,
+        "list": [
+            {
+                "id": 1001,
+                "court_id": 1,
+                "court_name": "篮球场1号",
+                "venue_name": "南校区体育中心",
+                "slot_date": "2026-04-11",
+                "start_time": "2026-04-11 08:00:00",
+                "end_time": "2026-04-11 09:00:00",
+                "status": 0,
+                "status_text": "可预约",
+                "booking_id": null,
+                "booking_user": null,
+                "create_time": "2026-04-01 10:00:00"
+            },
+            {
+                "id": 1002,
+                "court_id": 1,
+                "court_name": "篮球场1号",
+                "venue_name": "南校区体育中心",
+                "slot_date": "2026-04-11",
+                "start_time": "2026-04-11 09:00:00",
+                "end_time": "2026-04-11 10:00:00",
+                "status": 2,
+                "status_text": "已预约",
+                "booking_id": 2001,
+                "booking_user": "zhangsan",
+                "create_time": "2026-04-01 10:00:00"
+            }
+        ]
+    }
+}
+三、更新时间片
+接口路径：PUT /admin/timeslot/{slotId}
+请求方式：PUT
+请求参数
+参数名        类型        必填        说明
+status        int        否        状态（0/1/2）
+reason        string        否        修改原因
+请求示例
+{
+    "status": 1,
+    "reason": "场地维护，临时锁定"
+}
+响应示例
+{
+    "code": 200,
+    "message": "更新成功"
+}
+错误响应
+{
+    "code": 400,
+    "message": "该时间片已被预约，无法改为可预约状态"
+}
+四、删除时间片
+接口路径：DELETE /admin/timeslot/{slotId}
+请求方式：DELETE
+请求参数
+参数名        类型        必填        说明
+force        boolean        否        是否强制删除，默认 false
+响应示例
+{
+    "code": 200,
+    "message": "删除成功"
+}
+错误响应
+{
+    "code": 400,
+    "message": "该时间片已被预约，无法删除。如需删除请先取消预约或使用强制删除"
+}
+五、批量删除时间片
+接口路径：DELETE /admin/timeslot/batch
+请求方式：DELETE
+请求参数
+参数名        类型        必填        说明
+slot_ids        array        是        时间片 ID 列表
+force        boolean        否        是否强制删除，默认 false
+请求示例
+{
+    "slot_ids": [1001, 1002, 1003],
+    "force": false
+}
+响应示例
+{
+    "code": 200,
+    "message": "批量删除完成",
+    "data": {
+        "success_count": 2,
+        "fail_count": 1,
+        "failed_ids": [1002],
+        "fail_reason": "时间片1002已被预约"
+    }
+}
+六、锁定 / 解锁时间片
+接口路径：PUT /admin/timeslot/{slotId}/lock
+请求方式：PUT
+请求参数
+参数名        类型        必填        说明
+locked        boolean        是        true 锁定 /false 解锁
+reason        string        否        操作原因
+请求示例
+{
+    "locked": true,
+    "reason": "场地维修，暂停预约"
+}
+响应示例
+{
+    "code": 200,
+    "message": "已锁定，该时间段暂时不可预约"
+}
+七、状态码说明
+code        说明
+200        成功
+400        参数错误或业务冲突
+401        未授权 / 未登录
+403        无权限（非管理员）
+404        时间片不存在
+八、时间片状态枚举
+值        说明
+0        可预约
+1        锁定中
+2        已预约
+使用方法
+1. 新建一个空白 Word 文档
+2. 全选复制上面所有内容
+3. 粘贴到 Word 中
+4. 可根据需要调整字体、字号、行距、表格样式
+如果你需要，我也可以帮你生成可直接下载的 .docx 文件（通过网盘 / 文本导出），或者帮你调整为课程报告 / 项目文档正式格式。

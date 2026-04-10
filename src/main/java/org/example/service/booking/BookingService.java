@@ -12,6 +12,7 @@ import org.example.vo.booking.BookingListItemVO;
 import org.example.vo.booking.CourtSlotsVO;
 import org.example.vo.booking.PaymentPayResultVO;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 /**
@@ -34,4 +35,8 @@ public interface BookingService {
     CourtSlotsVO getCourtSlots(Long courtId, String date);
 
     List<AvailableSlotVO> getAvailableSlots(Long courtId, String date, String startTime, String endTime);
+
+    void refund(Long bookingId, Long userId, BigDecimal amount, String refundType);
+
+    void timeoutCancel(Long bookingId);
 }

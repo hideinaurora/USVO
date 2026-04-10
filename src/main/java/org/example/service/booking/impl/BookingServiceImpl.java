@@ -3,6 +3,7 @@ package org.example.service.booking.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.example.common.PageResult;
 import org.example.config.exception.CommonJsonException;
@@ -53,6 +54,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 public class BookingServiceImpl implements BookingService {
 
@@ -485,5 +487,53 @@ public class BookingServiceImpl implements BookingService {
             default:
                 return "未知";
         }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void refund(Long bookingId, Long userId, BigDecimal amount, String refundType) {
+        log.info("MQ退款回调: bookingId={}, userId={}, amount={}, refundType={}", bookingId, userId, amount, refundType);
+        BookingEntity booking = bookingMapper.selectById(bookingId);
+        if (booking == null) {
+            log.warn("退款回调失败: 预约不存在, bookingId={}", bookingId);
+            return;
+        }
+        if (booking.getStatus() == null || (booking.getStatus() != 0 && booking.getStatus() != 1)) {
+            log.warn("退款回调失败: 预约状态不是待支付或已预约, bookingId={}, status={}", bookingId, booking.getStatus());
+            return;
+        }
+        LambdaUpdateWrapper<PaymentEntity> pw = new LambdaUpdateWrapper<>();
+        pw.eq(PaymentEntity::getBookingId, bookingId)
+                .eq(PaymentEntity::getStatus, 1)
+                .set(PaymentEntity::getStatus, 2);
+        paymentMapper.update(null, pw);
+        log.info("退款回调成功: 标记payment为已退款, bookingId={}", bookingId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void timeoutCancel(Long bookingId) {
+        log.info("MQ超时取消回调: bookingId={}", bookingId);
+        BookingEntity booking = bookingMapper.selectById(bookingId);
+        if (booking == null) {
+            log.warn("超时取消回调失败: 预约不存在, bookingId={}", bookingId);
+            return;
+        }
+        if (booking.getStatus() == null || booking.getStatus() != 0) {
+            log.warn("超时取消回调失败: 预约状态不是待支付, bookingId={}, status={}", bookingId, booking.getStatus());
+            return;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        BookingEntity bu = new BookingEntity();
+        bu.setId(bookingId);
+        bu.setStatus(2);
+        bu.setCancelTime(now);
+        bookingMapper.updateById(bu);
+        LambdaUpdateWrapper<TimeSlotEntity> su = new LambdaUpdateWrapper<>();
+        su.eq(TimeSlotEntity::getBookingId, bookingId)
+                .set(TimeSlotEntity::getStatus, 0)
+                .set(TimeSlotEntity::getBookingId, null);
+        timeSlotMapper.update(null, su);
+        log.info("超时取消回调成功: 预约已取消, 时间片已释放, bookingId={}", bookingId);
     }
 }
