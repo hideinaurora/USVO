@@ -14,16 +14,24 @@ import org.example.dto.LoginRequestDTO;
 import org.example.dto.admin.BookingForceCancelDTO;
 import org.example.dto.admin.CourtAddDTO;
 import org.example.dto.admin.CourtUpdateDTO;
+import org.example.dto.admin.TimeSlotBatchDeleteDTO;
+import org.example.dto.admin.TimeSlotGenerateDTO;
+import org.example.dto.admin.TimeSlotLockDTO;
+import org.example.dto.admin.TimeSlotUpdateDTO;
 import org.example.dto.admin.UserStatusDTO;
 import org.example.dto.admin.VenueAddDTO;
 import org.example.dto.admin.VenueUpdateDTO;
 import org.example.service.TokenService;
 import org.example.service.basic.user.UserService;
+import org.example.service.booking.TimeSlotService;
 import org.example.service.sys.admin.AdminService;
 import org.example.service.venue.VenueService;
 import org.example.utils.exception.CommonUtil;
 import org.example.vo.CaptchaVO;
 import org.example.vo.LoginResponseVO;
+import org.example.vo.admin.TimeSlotBatchDeleteResultVO;
+import org.example.vo.admin.TimeSlotGenerateResultVO;
+import org.example.vo.admin.TimeSlotListItemVO;
 import org.example.vo.admin.VenueListItemVO;
 import org.springframework.web.bind.annotation.*;
 
@@ -56,6 +64,9 @@ public class AdminController {
 
     @Resource
     private VenueService venueService;
+
+    @Resource
+    private TimeSlotService timeSlotService;
 
     @Operation(summary = "管理员登录", description = "用户登录验证，包含验证码校验。登录成功返回JWT令牌和用户信息")
     @PostMapping("/login")
@@ -390,6 +401,132 @@ public class AdminController {
         } catch (Exception e) {
             log.error("强制取消预约失败", e);
             throw new CommonJsonException("强制取消预约失败");
+        }
+    }
+
+    @Operation(summary = "生成时间片", description = "批量生成时间片",
+            parameters = {
+                    @Parameter(name = "Authorization", description = "Bearer Token", required = true, in = ParameterIn.HEADER)
+            })
+    @PostMapping("/timeslot/generate")
+    @RequiresPermissions(value = "admin:timeslot:generate", apiAuth = {ApiAuth.ADMIN})
+    public ApiResponse<TimeSlotGenerateResultVO> generateTimeSlots(@Valid @RequestBody TimeSlotGenerateDTO dto) {
+        try {
+            TimeSlotGenerateResultVO result = timeSlotService.generateTimeSlots(dto);
+            return ApiResponse.success("生成成功", result);
+        } catch (CommonJsonException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("生成时间片失败", e);
+            throw new CommonJsonException("生成时间片失败");
+        }
+    }
+
+    @Operation(summary = "时间片列表查询", description = "分页查询时间片列表",
+            parameters = {
+                    @Parameter(name = "Authorization", description = "Bearer Token", required = true, in = ParameterIn.HEADER)
+            })
+    @GetMapping("/timeslot/list")
+    @RequiresPermissions(value = "admin:timeslot:list", apiAuth = {ApiAuth.ADMIN})
+    public ApiResponse<Map<String, Object>> getTimeSlotList(
+            @RequestParam(required = false) Long courtId,
+            @RequestParam(required = false) Long venueId,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
+            @RequestParam(required = false) Integer status,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size
+    ) {
+        try {
+            Map<String, Object> result = timeSlotService.getTimeSlotList(courtId, venueId, startDate, endDate, status, page, size);
+            return ApiResponse.success(result);
+        } catch (CommonJsonException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("获取时间片列表失败", e);
+            throw new CommonJsonException("获取时间片列表失败");
+        }
+    }
+
+    @Operation(summary = "更新时间片", description = "更新时间片状态",
+            parameters = {
+                    @Parameter(name = "Authorization", description = "Bearer Token", required = true, in = ParameterIn.HEADER)
+            })
+    @PutMapping("/timeslot/{slotId}")
+    @RequiresPermissions(value = "admin:timeslot:update", apiAuth = {ApiAuth.ADMIN})
+    public ApiResponse<Void> updateTimeSlot(
+            @Parameter(description = "时间片ID", required = true) @PathVariable Long slotId,
+            @Valid @RequestBody TimeSlotUpdateDTO dto
+    ) {
+        try {
+            timeSlotService.updateTimeSlot(slotId, dto);
+            return ApiResponse.success("更新成功", null);
+        } catch (CommonJsonException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("更新时间片失败", e);
+            throw new CommonJsonException("更新时间片失败");
+        }
+    }
+
+    @Operation(summary = "删除时间片", description = "删除单个时间片",
+            parameters = {
+                    @Parameter(name = "Authorization", description = "Bearer Token", required = true, in = ParameterIn.HEADER)
+            })
+    @DeleteMapping("/timeslot/{slotId}")
+    @RequiresPermissions(value = "admin:timeslot:delete", apiAuth = {ApiAuth.ADMIN})
+    public ApiResponse<Void> deleteTimeSlot(
+            @Parameter(description = "时间片ID", required = true) @PathVariable Long slotId,
+            @RequestParam(required = false) Boolean force
+    ) {
+        try {
+            timeSlotService.deleteTimeSlot(slotId, force);
+            return ApiResponse.success("删除成功", null);
+        } catch (CommonJsonException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("删除时间片失败", e);
+            throw new CommonJsonException("删除时间片失败");
+        }
+    }
+
+    @Operation(summary = "批量删除时间片", description = "批量删除时间片",
+            parameters = {
+                    @Parameter(name = "Authorization", description = "Bearer Token", required = true, in = ParameterIn.HEADER)
+            })
+    @DeleteMapping("/timeslot/batch")
+    @RequiresPermissions(value = "admin:timeslot:batchDelete", apiAuth = {ApiAuth.ADMIN})
+    public ApiResponse<TimeSlotBatchDeleteResultVO> batchDeleteTimeSlots(@Valid @RequestBody TimeSlotBatchDeleteDTO dto) {
+        try {
+            TimeSlotBatchDeleteResultVO result = timeSlotService.batchDeleteTimeSlots(dto);
+            return ApiResponse.success("批量删除完成", result);
+        } catch (CommonJsonException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("批量删除时间片失败", e);
+            throw new CommonJsonException("批量删除时间片失败");
+        }
+    }
+
+    @Operation(summary = "锁定/解锁时间片", description = "锁定或解锁时间片",
+            parameters = {
+                    @Parameter(name = "Authorization", description = "Bearer Token", required = true, in = ParameterIn.HEADER)
+            })
+    @PutMapping("/timeslot/{slotId}/lock")
+    @RequiresPermissions(value = "admin:timeslot:lock", apiAuth = {ApiAuth.ADMIN})
+    public ApiResponse<Void> lockTimeSlot(
+            @Parameter(description = "时间片ID", required = true) @PathVariable Long slotId,
+            @Valid @RequestBody TimeSlotLockDTO dto
+    ) {
+        try {
+            timeSlotService.lockTimeSlot(slotId, dto);
+            String message = Boolean.TRUE.equals(dto.getLocked()) ? "已锁定，该时间段暂时不可预约" : "已解锁，该时间段可以预约";
+            return ApiResponse.success(message, null);
+        } catch (CommonJsonException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("锁定/解锁时间片失败", e);
+            throw new CommonJsonException("锁定/解锁时间片失败");
         }
     }
 }

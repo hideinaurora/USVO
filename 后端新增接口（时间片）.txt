@@ -3,7 +3,7 @@
 文档说明
 本文档为时间片管理模块新增接口说明，所有管理接口均需要管理员权限，请求头需携带有效 Token。
 基础信息
-Base URL：http://localhost:8080/api
+Base URL：http://localhost:9046/api
 请求头：Authorization: Bearer {token}
 权限要求：所有接口需要管理员权限
 一、生成时间片
