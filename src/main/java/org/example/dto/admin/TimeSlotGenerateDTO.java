@@ -7,7 +7,6 @@ import lombok.Setter;
 
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
-import java.math.BigDecimal;
 
 @Getter
 @Setter
@@ -19,15 +18,21 @@ public class TimeSlotGenerateDTO {
     @Schema(description = "场地ID", required = true)
     private Long courtId;
 
-    @NotBlank(message = "开始日期不能为空")
     @JsonProperty("start_date")
-    @Schema(description = "开始日期（YYYY-MM-DD）", required = true)
+    @Schema(description = "开始日期（YYYY-MM-DD），为空则默认当天")
     private String startDate;
 
-    @NotBlank(message = "结束日期不能为空")
     @JsonProperty("end_date")
-    @Schema(description = "结束日期（YYYY-MM-DD）", required = true)
+    @Schema(description = "结束日期（YYYY-MM-DD），为空则默认当天")
     private String endDate;
+
+    @JsonProperty("start_time")
+    @Schema(description = "开始时间（HH:mm:ss），为空则默认场馆开放时间")
+    private String startTime;
+
+    @JsonProperty("end_time")
+    @Schema(description = "结束时间（HH:mm:ss），为空则默认场馆关闭时间")
+    private String endTime;
 
     @JsonProperty("slot_duration_minutes")
     @Schema(description = "时间段粒度（分钟），默认60")

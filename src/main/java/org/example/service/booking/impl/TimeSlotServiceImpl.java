@@ -71,8 +71,12 @@ public class TimeSlotServiceImpl implements TimeSlotService {
             throw new CommonJsonException(new OpResultDTO(404L, "场馆不存在"));
         }
 
-        LocalDate startDate = LocalDate.parse(dto.getStartDate(), DATE_FMT);
-        LocalDate endDate = LocalDate.parse(dto.getEndDate(), DATE_FMT);
+        LocalDate today = LocalDate.now();
+        LocalDate startDate = StringUtils.isNotBlank(dto.getStartDate())
+                ? LocalDate.parse(dto.getStartDate(), DATE_FMT) : today;
+        LocalDate endDate = StringUtils.isNotBlank(dto.getEndDate())
+                ? LocalDate.parse(dto.getEndDate(), DATE_FMT) : today;
+
         if (startDate.isAfter(endDate)) {
             throw new CommonJsonException(new OpResultDTO(400L, "开始日期不能晚于结束日期"));
         }
@@ -82,8 +86,23 @@ public class TimeSlotServiceImpl implements TimeSlotService {
             throw new CommonJsonException(new OpResultDTO(400L, "时间粒度必须在1-1440分钟之间"));
         }
 
-        LocalTime openTime = LocalTime.parse(venue.getOpenTime(), TIME_FMT);
-        LocalTime closeTime = LocalTime.parse(venue.getCloseTime(), TIME_FMT);
+        LocalTime venueOpenTime = LocalTime.parse(venue.getOpenTime(), TIME_FMT);
+        LocalTime venueCloseTime = LocalTime.parse(venue.getCloseTime(), TIME_FMT);
+
+        LocalTime dayStartTime = StringUtils.isNotBlank(dto.getStartTime())
+                ? LocalTime.parse(dto.getStartTime(), TIME_FMT) : venueOpenTime;
+        LocalTime dayEndTime = StringUtils.isNotBlank(dto.getEndTime())
+                ? LocalTime.parse(dto.getEndTime(), TIME_FMT) : venueCloseTime;
+
+        if (dayStartTime.isBefore(venueOpenTime)) {
+            dayStartTime = venueOpenTime;
+        }
+        if (dayEndTime.isAfter(venueCloseTime)) {
+            dayEndTime = venueCloseTime;
+        }
+        if (dayStartTime.compareTo(dayEndTime) >= 0) {
+            throw new CommonJsonException(new OpResultDTO(400L, "开始时间不能晚于结束时间"));
+        }
 
         boolean ignoreExisting = dto.getIgnoreExisting() != null && dto.getIgnoreExisting();
 
@@ -93,8 +112,8 @@ public class TimeSlotServiceImpl implements TimeSlotService {
 
         LocalDate current = startDate;
         while (!current.isAfter(endDate)) {
-            LocalTime slotStart = openTime;
-            while (slotStart.plusMinutes(duration).compareTo(closeTime) <= 0) {
+            LocalTime slotStart = dayStartTime;
+            while (slotStart.plusMinutes(duration).compareTo(dayEndTime) <= 0) {
                 LocalTime slotEnd = slotStart.plusMinutes(duration);
 
                 QueryWrapper<TimeSlotEntity> existWrapper = new QueryWrapper<>();
