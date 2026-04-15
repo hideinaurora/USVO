@@ -39,4 +39,6 @@ public interface BookingService {
     void refund(Long bookingId, Long userId, BigDecimal amount, String refundType);
 
     void timeoutCancel(Long bookingId);
+
+    void bookingComplete(Long bookingId);
 }

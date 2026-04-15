@@ -7,6 +7,7 @@ import org.example.entity.activity.apply.ApplyPayEntity;
 import org.example.entity.failed.delayed.DelayedMessageEntity;
 import org.example.service.ApplyLockService;
 import org.example.service.activity.apply.ApplyPayService;
+import org.example.service.booking.BookingService;
 import org.example.service.failed.delayed.DelayedMessageService;
 import org.redisson.api.RBucket;
 import org.redisson.api.RedissonClient;
@@ -18,6 +19,7 @@ import javax.annotation.Resource;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -44,6 +46,8 @@ public class DelayedConsumer {
     private ApplyLockService applyLockService;
     @Resource
     private RedissonClient redissonClient;
+    @Resource
+    private BookingService bookingService;
 
     /**
      * 监听延迟队列
@@ -123,9 +127,30 @@ public class DelayedConsumer {
      */
     private void processDelayedMessageWithRetry(String messageBody, int retryCount, String messageId) {
         log.info("【延迟队列】开始处理延迟消息，第 {} 次尝试", retryCount + 1);
-        // 根据消息内容执行不同的业务逻辑
-        handleOrderTimeoutWithRetry(messageBody, retryCount);
+
+        if (messageBody != null && messageBody.startsWith("\"") && messageBody.endsWith("\"")) {
+            messageBody = messageBody.substring(1, messageBody.length() - 1);
+        }
+
+        log.info("【调试】messageBody = '{}'", messageBody);
+        log.info("【调试】messageBody长度 = {}", messageBody.length());
+        log.info("【调试】startsWith检查 = {}", messageBody.startsWith("BOOKING_COMPLETE:"));
+        log.info("【调试】前20个字符 = '{}'", messageBody.substring(0, Math.min(20, messageBody.length())));
+
+        if (messageBody.startsWith("BOOKING_COMPLETE:")) {
+            String bookingIdStr = messageBody.substring("BOOKING_COMPLETE:".length());
+            Long bookingId = Long.parseLong(bookingIdStr);
+            handleBookingComplete(bookingId, retryCount);
+        } else {
+            handleOrderTimeoutWithRetry(messageBody, retryCount);
+        }
         log.info("【延迟队列】✅ 延迟消息处理成功");
+    }
+
+    private void handleBookingComplete(Long bookingId, int retryCount) {
+        log.info("【业务处理】执行预约完成逻辑: bookingId={}, 重试次数={}", bookingId, retryCount);
+        bookingService.bookingComplete(bookingId);
+        log.info("【预约完成】✅ 预约完成处理成功: bookingId={}", bookingId);
     }
 
     /**

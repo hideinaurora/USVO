@@ -76,6 +76,8 @@ public class BookingServiceImpl implements BookingService {
     private VenueMapper venueMapper;
     @Resource
     private UserService userService;
+    @Resource
+    private org.example.mq.delayed.DelayedProducer delayedProducer;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -198,6 +200,17 @@ public class BookingServiceImpl implements BookingService {
         su.eq(TimeSlotEntity::getBookingId, booking.getId())
                 .set(TimeSlotEntity::getStatus, 2);
         timeSlotMapper.update(null, su);
+
+        long delayMillis = Duration.between(LocalDateTime.now(), booking.getEndTime()).toMillis();
+        if (delayMillis > 0) {
+            delayedProducer.sendDelayedMessage(
+                    "BOOKING_COMPLETE:" + booking.getId(),
+                    delayMillis
+            );
+            log.info("已发送预约完成延迟消息: bookingId={}, 延迟={}ms", booking.getId(), delayMillis);
+        } else {
+            bookingComplete(booking.getId());
+        }
 
         PaymentPayResultVO vo = new PaymentPayResultVO();
         vo.setPaymentId(payment.getId());
@@ -535,5 +548,26 @@ public class BookingServiceImpl implements BookingService {
                 .set(TimeSlotEntity::getBookingId, null);
         timeSlotMapper.update(null, su);
         log.info("超时取消回调成功: 预约已取消, 时间片已释放, bookingId={}", bookingId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void bookingComplete(Long bookingId) {
+        log.info("MQ预约完成回调: bookingId={}", bookingId);
+        BookingEntity booking = bookingMapper.selectById(bookingId);
+        if (booking == null) {
+            log.warn("预约完成回调失败: 预约不存在, bookingId={}", bookingId);
+            return;
+        }
+        if (booking.getStatus() == null || booking.getStatus() != 1) {
+            log.warn("预约完成回调失败: 预约状态不是已预约, bookingId={}, status={}", bookingId, booking.getStatus());
+            return;
+        }
+        LambdaUpdateWrapper<TimeSlotEntity> su = new LambdaUpdateWrapper<>();
+        su.eq(TimeSlotEntity::getBookingId, bookingId)
+                .set(TimeSlotEntity::getStatus, 0)
+                .set(TimeSlotEntity::getBookingId, null);
+        timeSlotMapper.update(null, su);
+        log.info("预约完成回调成功: 时间片已释放, bookingId={}", bookingId);
     }
 }
