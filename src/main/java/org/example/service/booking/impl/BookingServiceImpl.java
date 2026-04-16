@@ -599,11 +599,15 @@ public class BookingServiceImpl implements BookingService {
             log.warn("预约完成回调失败: 预约状态不是已预约, bookingId={}, status={}", bookingId, booking.getStatus());
             return;
         }
+        BookingEntity bu = new BookingEntity();
+        bu.setId(bookingId);
+        bu.setStatus(3);
+        bookingMapper.updateById(bu);
         LambdaUpdateWrapper<TimeSlotEntity> su = new LambdaUpdateWrapper<>();
         su.eq(TimeSlotEntity::getBookingId, bookingId)
                 .set(TimeSlotEntity::getStatus, 0)
                 .set(TimeSlotEntity::getBookingId, null);
         timeSlotMapper.update(null, su);
-        log.info("预约完成回调成功: 时间片已释放, bookingId={}", bookingId);
+        log.info("预约完成回调成功: 预约状态已改为已完成(3), 时间片已释放, bookingId={}", bookingId);
     }
 }
