@@ -40,5 +40,7 @@ public interface BookingService {
 
     void timeoutCancel(Long bookingId);
 
+    void timeoutCancelAsBreach(Long bookingId);
+
     void bookingComplete(Long bookingId);
 }

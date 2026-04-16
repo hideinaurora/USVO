@@ -154,6 +154,15 @@ public class BookingServiceImpl implements BookingService {
 
         BigDecimal depositAmount = totalAmount.multiply(DEPOSIT_RATIO).setScale(2, RoundingMode.HALF_UP);
 
+        long timeoutMillis = 15 * 60 * 1000L;
+        for (Long bookingId : bookingIds) {
+            delayedProducer.sendDelayedMessage(
+                    "BOOKING_TIMEOUT:" + bookingId,
+                    timeoutMillis
+            );
+            log.info("已发送超时违约延迟消息: bookingId={}, 延迟={}ms", bookingId, timeoutMillis);
+        }
+
         BookingCreateResultVO vo = new BookingCreateResultVO();
         vo.setBookingIds(bookingIds);
         vo.setCourtName(court.getName());
@@ -548,6 +557,33 @@ public class BookingServiceImpl implements BookingService {
                 .set(TimeSlotEntity::getBookingId, null);
         timeSlotMapper.update(null, su);
         log.info("超时取消回调成功: 预约已取消, 时间片已释放, bookingId={}", bookingId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void timeoutCancelAsBreach(Long bookingId) {
+        log.info("MQ超时违约回调: bookingId={}", bookingId);
+        BookingEntity booking = bookingMapper.selectById(bookingId);
+        if (booking == null) {
+            log.warn("超时违约回调失败: 预约不存在, bookingId={}", bookingId);
+            return;
+        }
+        if (booking.getStatus() == null || booking.getStatus() != 0) {
+            log.warn("超时违约回调失败: 预约状态不是待支付, bookingId={}, status={}", bookingId, booking.getStatus());
+            return;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        BookingEntity bu = new BookingEntity();
+        bu.setId(bookingId);
+        bu.setStatus(4);
+        bu.setCancelTime(now);
+        bookingMapper.updateById(bu);
+        LambdaUpdateWrapper<TimeSlotEntity> su = new LambdaUpdateWrapper<>();
+        su.eq(TimeSlotEntity::getBookingId, bookingId)
+                .set(TimeSlotEntity::getStatus, 0)
+                .set(TimeSlotEntity::getBookingId, null);
+        timeSlotMapper.update(null, su);
+        log.info("超时违约回调成功: 预约状态已改为违约(4), 时间片已释放, bookingId={}", bookingId);
     }
 
     @Override

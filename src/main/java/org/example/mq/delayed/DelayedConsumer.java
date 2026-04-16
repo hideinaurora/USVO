@@ -132,15 +132,19 @@ public class DelayedConsumer {
             messageBody = messageBody.substring(1, messageBody.length() - 1);
         }
 
-        log.info("【调试】messageBody = '{}'", messageBody);
-        log.info("【调试】messageBody长度 = {}", messageBody.length());
-        log.info("【调试】startsWith检查 = {}", messageBody.startsWith("BOOKING_COMPLETE:"));
-        log.info("【调试】前20个字符 = '{}'", messageBody.substring(0, Math.min(20, messageBody.length())));
+//        log.info("【调试】messageBody = '{}'", messageBody);
+//        log.info("【调试】messageBody长度 = {}", messageBody.length());
+//        log.info("【调试】startsWith检查 = {}", messageBody.startsWith("BOOKING_COMPLETE:"));
+//        log.info("【调试】前20个字符 = '{}'", messageBody.substring(0, Math.min(20, messageBody.length())));
 
         if (messageBody.startsWith("BOOKING_COMPLETE:")) {
             String bookingIdStr = messageBody.substring("BOOKING_COMPLETE:".length());
             Long bookingId = Long.parseLong(bookingIdStr);
             handleBookingComplete(bookingId, retryCount);
+        } else if (messageBody.startsWith("BOOKING_TIMEOUT:")) {
+            String bookingIdStr = messageBody.substring("BOOKING_TIMEOUT:".length());
+            Long bookingId = Long.parseLong(bookingIdStr);
+            handleBookingTimeout(bookingId, retryCount);
         } else {
             handleOrderTimeoutWithRetry(messageBody, retryCount);
         }
@@ -151,6 +155,12 @@ public class DelayedConsumer {
         log.info("【业务处理】执行预约完成逻辑: bookingId={}, 重试次数={}", bookingId, retryCount);
         bookingService.bookingComplete(bookingId);
         log.info("【预约完成】✅ 预约完成处理成功: bookingId={}", bookingId);
+    }
+
+    private void handleBookingTimeout(Long bookingId, int retryCount) {
+        log.info("【业务处理】执行超时违约逻辑: bookingId={}, 重试次数={}", bookingId, retryCount);
+        bookingService.timeoutCancelAsBreach(bookingId);
+        log.info("【超时违约】✅ 超时违约处理成功: bookingId={}", bookingId);
     }
 
     /**
