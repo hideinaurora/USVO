@@ -204,57 +204,69 @@ public class BookingServiceImpl implements BookingService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public PaymentPayResultVO payDeposit(Long userId, PaymentPayDTO dto) {
-        BookingEntity booking = bookingMapper.selectById(dto.getBookingId());
-        if (booking == null || !Objects.equals(booking.getUserId(), userId)) {
-            throw new CommonJsonException(new OpResultDTO(404L, "预约不存在"));
+        String lockKey = "lock:booking:pay:" + dto.getBookingId();
+        RLock lock = redissonClient.getLock(lockKey);
+        try {
+            lock.tryLock(5, 30, TimeUnit.SECONDS);
+            BookingEntity booking = bookingMapper.selectById(dto.getBookingId());
+            if (booking == null || !Objects.equals(booking.getUserId(), userId)) {
+                throw new CommonJsonException(new OpResultDTO(404L, "预约不存在"));
+            }
+            if (booking.getStatus() == null || booking.getStatus() != 0) {
+                throw new CommonJsonException(new OpResultDTO(400L, "当前状态不可支付"));
+            }
+
+            QueryWrapper<PaymentEntity> paidQ = new QueryWrapper<>();
+            paidQ.eq("booking_id", dto.getBookingId()).eq("status", 1);
+            if (paymentMapper.selectCount(paidQ) > 0) {
+                throw new CommonJsonException(new OpResultDTO(400L, "该预约已支付"));
+            }
+
+            PaymentEntity payment = new PaymentEntity();
+            payment.setBookingId(dto.getBookingId());
+            payment.setUserId(userId);
+            payment.setAmount(booking.getDepositAmount());
+            payment.setPayType(dto.getPayType());
+            payment.setStatus(1);
+            payment.setTransactionNo("TXN" + System.currentTimeMillis());
+            paymentMapper.insert(payment);
+
+            BookingEntity bu = new BookingEntity();
+            bu.setId(booking.getId());
+            bu.setStatus(1);
+            bookingMapper.updateById(bu);
+
+            LambdaUpdateWrapper<TimeSlotEntity> su = new LambdaUpdateWrapper<>();
+            su.eq(TimeSlotEntity::getBookingId, booking.getId())
+                    .set(TimeSlotEntity::getStatus, 2);
+            timeSlotMapper.update(null, su);
+
+            long delayMillis = Duration.between(LocalDateTime.now(), booking.getEndTime()).toMillis();
+            if (delayMillis > 0) {
+                delayedProducer.sendDelayedMessage(
+                        "BOOKING_COMPLETE:" + booking.getId(),
+                        delayMillis
+                );
+                log.info("已发送预约完成延迟消息: bookingId={}, 延迟={}ms", booking.getId(), delayMillis);
+            } else {
+                bookingComplete(booking.getId());
+            }
+
+            PaymentPayResultVO vo = new PaymentPayResultVO();
+            vo.setPaymentId(payment.getId());
+            vo.setBookingId(booking.getId());
+            vo.setAmount(payment.getAmount());
+            vo.setStatus(payment.getStatus());
+            vo.setTransactionNo(payment.getTransactionNo());
+            return vo;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new CommonJsonException(new OpResultDTO(500L, "支付过程被中断，请重试"));
+        } finally {
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
         }
-        if (booking.getStatus() == null || booking.getStatus() != 0) {
-            throw new CommonJsonException(new OpResultDTO(400L, "当前状态不可支付"));
-        }
-
-        QueryWrapper<PaymentEntity> paidQ = new QueryWrapper<>();
-        paidQ.eq("booking_id", dto.getBookingId()).eq("status", 1);
-        if (paymentMapper.selectCount(paidQ) > 0) {
-            throw new CommonJsonException(new OpResultDTO(400L, "该预约已支付"));
-        }
-
-        PaymentEntity payment = new PaymentEntity();
-        payment.setBookingId(dto.getBookingId());
-        payment.setUserId(userId);
-        payment.setAmount(booking.getDepositAmount());
-        payment.setPayType(dto.getPayType());
-        payment.setStatus(1);
-        payment.setTransactionNo("TXN" + System.currentTimeMillis());
-        paymentMapper.insert(payment);
-
-        BookingEntity bu = new BookingEntity();
-        bu.setId(booking.getId());
-        bu.setStatus(1);
-        bookingMapper.updateById(bu);
-
-        LambdaUpdateWrapper<TimeSlotEntity> su = new LambdaUpdateWrapper<>();
-        su.eq(TimeSlotEntity::getBookingId, booking.getId())
-                .set(TimeSlotEntity::getStatus, 2);
-        timeSlotMapper.update(null, su);
-
-        long delayMillis = Duration.between(LocalDateTime.now(), booking.getEndTime()).toMillis();
-        if (delayMillis > 0) {
-            delayedProducer.sendDelayedMessage(
-                    "BOOKING_COMPLETE:" + booking.getId(),
-                    delayMillis
-            );
-            log.info("已发送预约完成延迟消息: bookingId={}, 延迟={}ms", booking.getId(), delayMillis);
-        } else {
-            bookingComplete(booking.getId());
-        }
-
-        PaymentPayResultVO vo = new PaymentPayResultVO();
-        vo.setPaymentId(payment.getId());
-        vo.setBookingId(booking.getId());
-        vo.setAmount(payment.getAmount());
-        vo.setStatus(payment.getStatus());
-        vo.setTransactionNo(payment.getTransactionNo());
-        return vo;
     }
 
     @Override
@@ -265,43 +277,69 @@ public class BookingServiceImpl implements BookingService {
             throw new CommonJsonException(new OpResultDTO(400L, "预约ID列表不能为空"));
         }
 
-        List<BookingEntity> bookings = bookingMapper.selectBatchIds(bookingIds);
-        if (bookings == null || bookings.size() != bookingIds.size()) {
-            throw new CommonJsonException(new OpResultDTO(404L, "部分预约不存在"));
-        }
-
-        for (BookingEntity booking : bookings) {
-            if (!Objects.equals(booking.getUserId(), userId)) {
-                throw new CommonJsonException(new OpResultDTO(403L, "预约[" + booking.getId() + "]不属于当前用户"));
-            }
-            Integer st = booking.getStatus();
-            if (st == null || st == 2 || st == 3 || st == 4) {
-                throw new CommonJsonException(new OpResultDTO(400L, "预约[" + booking.getId() + "]当前状态不可取消"));
-            }
-        }
-
-        LocalDateTime now = LocalDateTime.now();
+        Set<String> lockKeys = new HashSet<>();
         for (Long bookingId : bookingIds) {
-            BookingEntity booking = bookingMapper.selectById(bookingId);
-            Integer st = booking.getStatus();
+            lockKeys.add("lock:booking:cancel:" + bookingId);
+        }
 
-            BookingEntity bu = new BookingEntity();
-            bu.setId(bookingId);
-            bu.setStatus(2);
-            bu.setCancelTime(now);
-            bookingMapper.updateById(bu);
+        List<RLock> acquiredLocks = new ArrayList<>();
+        try {
+            for (String lockKey : lockKeys) {
+                RLock lock = redissonClient.getLock(lockKey);
+                boolean locked = lock.tryLock(5, 30, TimeUnit.SECONDS);
+                if (!locked) {
+                    throw new CommonJsonException(new OpResultDTO(409L, "系统繁忙，请稍后重试"));
+                }
+                acquiredLocks.add(lock);
+            }
 
-            LambdaUpdateWrapper<TimeSlotEntity> su = new LambdaUpdateWrapper<>();
-            su.eq(TimeSlotEntity::getBookingId, bookingId)
-                    .set(TimeSlotEntity::getStatus, 0)
-                    .set(TimeSlotEntity::getBookingId, null);
-            timeSlotMapper.update(null, su);
+            List<BookingEntity> bookings = bookingMapper.selectBatchIds(bookingIds);
+            if (bookings == null || bookings.size() != bookingIds.size()) {
+                throw new CommonJsonException(new OpResultDTO(404L, "部分预约不存在"));
+            }
 
-            if (st != null && st == 1) {
-                LambdaUpdateWrapper<PaymentEntity> pu = new LambdaUpdateWrapper<>();
-                pu.eq(PaymentEntity::getBookingId, bookingId).eq(PaymentEntity::getStatus, 1)
-                        .set(PaymentEntity::getStatus, 2);
-                paymentMapper.update(null, pu);
+            for (BookingEntity booking : bookings) {
+                if (!Objects.equals(booking.getUserId(), userId)) {
+                    throw new CommonJsonException(new OpResultDTO(403L, "预约[" + booking.getId() + "]不属于当前用户"));
+                }
+                Integer st = booking.getStatus();
+                if (st == null || st == 2 || st == 3 || st == 4) {
+                    throw new CommonJsonException(new OpResultDTO(400L, "预约[" + booking.getId() + "]当前状态不可取消"));
+                }
+            }
+
+            LocalDateTime now = LocalDateTime.now();
+            for (Long bookingId : bookingIds) {
+                BookingEntity booking = bookingMapper.selectById(bookingId);
+                Integer st = booking.getStatus();
+
+                BookingEntity bu = new BookingEntity();
+                bu.setId(bookingId);
+                bu.setStatus(2);
+                bu.setCancelTime(now);
+                bookingMapper.updateById(bu);
+
+                LambdaUpdateWrapper<TimeSlotEntity> su = new LambdaUpdateWrapper<>();
+                su.eq(TimeSlotEntity::getBookingId, bookingId)
+                        .set(TimeSlotEntity::getStatus, 0)
+                        .set(TimeSlotEntity::getBookingId, null);
+                timeSlotMapper.update(null, su);
+
+                if (st != null && st == 1) {
+                    LambdaUpdateWrapper<PaymentEntity> pu = new LambdaUpdateWrapper<>();
+                    pu.eq(PaymentEntity::getBookingId, bookingId).eq(PaymentEntity::getStatus, 1)
+                            .set(PaymentEntity::getStatus, 2);
+                    paymentMapper.update(null, pu);
+                }
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new CommonJsonException(new OpResultDTO(500L, "取消过程被中断，请重试"));
+        } finally {
+            for (RLock lock : acquiredLocks) {
+                if (lock.isHeldByCurrentThread()) {
+                    lock.unlock();
+                }
             }
         }
     }
@@ -541,22 +579,34 @@ public class BookingServiceImpl implements BookingService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void refund(Long bookingId, Long userId, BigDecimal amount, String refundType) {
-        log.info("MQ退款回调: bookingId={}, userId={}, amount={}, refundType={}", bookingId, userId, amount, refundType);
-        BookingEntity booking = bookingMapper.selectById(bookingId);
-        if (booking == null) {
-            log.warn("退款回调失败: 预约不存在, bookingId={}", bookingId);
-            return;
+        String lockKey = "lock:booking:refund:" + bookingId;
+        RLock lock = redissonClient.getLock(lockKey);
+        try {
+            lock.tryLock(5, 30, TimeUnit.SECONDS);
+            log.info("MQ退款回调: bookingId={}, userId={}, amount={}, refundType={}", bookingId, userId, amount, refundType);
+            BookingEntity booking = bookingMapper.selectById(bookingId);
+            if (booking == null) {
+                log.warn("退款回调失败: 预约不存在, bookingId={}", bookingId);
+                return;
+            }
+            if (booking.getStatus() == null || (booking.getStatus() != 0 && booking.getStatus() != 1)) {
+                log.warn("退款回调失败: 预约状态不是待支付或已预约, bookingId={}, status={}", bookingId, booking.getStatus());
+                return;
+            }
+            LambdaUpdateWrapper<PaymentEntity> pw = new LambdaUpdateWrapper<>();
+            pw.eq(PaymentEntity::getBookingId, bookingId)
+                    .eq(PaymentEntity::getStatus, 1)
+                    .set(PaymentEntity::getStatus, 2);
+            paymentMapper.update(null, pw);
+            log.info("退款回调成功: 标记payment为已退款, bookingId={}", bookingId);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("退款回调被中断: bookingId={}", bookingId);
+        } finally {
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
         }
-        if (booking.getStatus() == null || (booking.getStatus() != 0 && booking.getStatus() != 1)) {
-            log.warn("退款回调失败: 预约状态不是待支付或已预约, bookingId={}, status={}", bookingId, booking.getStatus());
-            return;
-        }
-        LambdaUpdateWrapper<PaymentEntity> pw = new LambdaUpdateWrapper<>();
-        pw.eq(PaymentEntity::getBookingId, bookingId)
-                .eq(PaymentEntity::getStatus, 1)
-                .set(PaymentEntity::getStatus, 2);
-        paymentMapper.update(null, pw);
-        log.info("退款回调成功: 标记payment为已退款, bookingId={}", bookingId);
     }
 
     @Override
