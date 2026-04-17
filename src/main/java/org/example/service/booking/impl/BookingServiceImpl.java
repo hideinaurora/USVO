@@ -35,6 +35,8 @@ import org.example.vo.booking.BookingPaymentVO;
 import org.example.vo.booking.CourtSlotsVO;
 import org.example.vo.booking.PaymentPayResultVO;
 import org.example.vo.booking.SlotItemVO;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -47,11 +49,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -78,6 +77,8 @@ public class BookingServiceImpl implements BookingService {
     private UserService userService;
     @Resource
     private org.example.mq.delayed.DelayedProducer delayedProducer;
+    @Resource
+    private RedissonClient redissonClient;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -92,86 +93,112 @@ public class BookingServiceImpl implements BookingService {
             throw new CommonJsonException(new OpResultDTO(404L, "场地不存在或已停用"));
         }
 
-        List<TimeSlotEntity> slots = timeSlotMapper.selectBatchIds(slotIds);
-        if (slots == null || slots.size() != slotIds.size()) {
-            throw new CommonJsonException(new OpResultDTO(404L, "部分时间片不存在"));
-        }
-
-        for (TimeSlotEntity slot : slots) {
-            if (!Objects.equals(slot.getCourtId(), dto.getCourtId())) {
-                throw new CommonJsonException(new OpResultDTO(400L, "时间片[" + slot.getId() + "]不属于该场地"));
-            }
-            if (slot.getStatus() == null || slot.getStatus() != 0) {
-                throw new CommonJsonException(new OpResultDTO(409L, "时间片[" + slot.getId() + "]已被预约，请重新选择"));
-            }
-        }
-
-        List<Long> bookingIds = new ArrayList<>();
-        List<BookingCreateResultVO.SlotInfo> slotInfos = new ArrayList<>();
-        BigDecimal totalAmount = BigDecimal.ZERO;
-
+        Set<String> lockKeys = new HashSet<>();
         for (Long slotId : slotIds) {
-            TimeSlotEntity slot = timeSlotMapper.selectById(slotId);
-
-            if (slot.getStartTime() == null || slot.getEndTime() == null) {
-                throw new CommonJsonException(new OpResultDTO(500L, "时间片数据异常"));
-            }
-            LocalDateTime start = slot.getStartTime();
-            LocalDateTime end = slot.getEndTime();
-
-            BigDecimal hours = durationHours(start, end);
-            BigDecimal slotAmount = court.getPricePerHour().multiply(hours).setScale(2, RoundingMode.HALF_UP);
-            totalAmount = totalAmount.add(slotAmount);
-
-            BookingEntity booking = new BookingEntity();
-            booking.setUserId(userId);
-            booking.setCourtId(dto.getCourtId());
-            booking.setStartTime(start);
-            booking.setEndTime(end);
-            booking.setTotalAmount(slotAmount);
-            booking.setDepositAmount(slotAmount.multiply(DEPOSIT_RATIO).setScale(2, RoundingMode.HALF_UP));
-            booking.setStatus(0);
-            bookingMapper.insert(booking);
-            bookingIds.add(booking.getId());
-
-            LambdaUpdateWrapper<TimeSlotEntity> uw = new LambdaUpdateWrapper<>();
-            uw.eq(TimeSlotEntity::getId, slotId)
-                    .eq(TimeSlotEntity::getStatus, 0)
-                    .set(TimeSlotEntity::getStatus, 1)
-                    .set(TimeSlotEntity::getBookingId, booking.getId());
-            int rows = timeSlotMapper.update(null, uw);
-            if (rows == 0) {
-                throw new CommonJsonException(new OpResultDTO(409L, "时间片[" + slotId + "]已被预约，请重新选择"));
-            }
-
-            BookingCreateResultVO.SlotInfo slotInfo = new BookingCreateResultVO.SlotInfo();
-            slotInfo.setSlotId(slotId);
-            slotInfo.setStartTime(start);
-            slotInfo.setEndTime(end);
-            slotInfo.setAmount(slotAmount);
-            slotInfos.add(slotInfo);
+            lockKeys.add("lock:booking:slot:" + slotId);
         }
 
-        BigDecimal depositAmount = totalAmount.multiply(DEPOSIT_RATIO).setScale(2, RoundingMode.HALF_UP);
+        List<RLock> acquiredLocks = new ArrayList<>();
+        try {
+            for (String lockKey : lockKeys) {
+                RLock lock = redissonClient.getLock(lockKey);
+                boolean locked = lock.tryLock(5, 30, TimeUnit.SECONDS);
+                if (!locked) {
+                    throw new CommonJsonException(new OpResultDTO(409L, "系统繁忙，请稍后重试"));
+                }
+                acquiredLocks.add(lock);
+            }
 
-        long timeoutMillis = 15 * 60 * 1000L;
-        for (Long bookingId : bookingIds) {
-            delayedProducer.sendDelayedMessage(
-                    "BOOKING_TIMEOUT:" + bookingId,
-                    timeoutMillis
-            );
-            log.info("已发送超时违约延迟消息: bookingId={}, 延迟={}ms", bookingId, timeoutMillis);
+            List<TimeSlotEntity> slots = timeSlotMapper.selectBatchIds(slotIds);
+            if (slots == null || slots.size() != slotIds.size()) {
+                throw new CommonJsonException(new OpResultDTO(404L, "部分时间片不存在"));
+            }
+
+            for (TimeSlotEntity slot : slots) {
+                if (!Objects.equals(slot.getCourtId(), dto.getCourtId())) {
+                    throw new CommonJsonException(new OpResultDTO(400L, "时间片[" + slot.getId() + "]不属于该场地"));
+                }
+                if (slot.getStatus() == null || slot.getStatus() != 0) {
+                    throw new CommonJsonException(new OpResultDTO(409L, "时间片[" + slot.getId() + "]已被预约，请重新选择"));
+                }
+            }
+
+            List<Long> bookingIds = new ArrayList<>();
+            List<BookingCreateResultVO.SlotInfo> slotInfos = new ArrayList<>();
+            BigDecimal totalAmount = BigDecimal.ZERO;
+
+            for (Long slotId : slotIds) {
+                TimeSlotEntity slot = timeSlotMapper.selectById(slotId);
+
+                if (slot.getStartTime() == null || slot.getEndTime() == null) {
+                    throw new CommonJsonException(new OpResultDTO(500L, "时间片数据异常"));
+                }
+                LocalDateTime start = slot.getStartTime();
+                LocalDateTime end = slot.getEndTime();
+
+                BigDecimal hours = durationHours(start, end);
+                BigDecimal slotAmount = court.getPricePerHour().multiply(hours).setScale(2, RoundingMode.HALF_UP);
+                totalAmount = totalAmount.add(slotAmount);
+
+                BookingEntity booking = new BookingEntity();
+                booking.setUserId(userId);
+                booking.setCourtId(dto.getCourtId());
+                booking.setStartTime(start);
+                booking.setEndTime(end);
+                booking.setTotalAmount(slotAmount);
+                booking.setDepositAmount(slotAmount.multiply(DEPOSIT_RATIO).setScale(2, RoundingMode.HALF_UP));
+                booking.setStatus(0);
+                bookingMapper.insert(booking);
+                bookingIds.add(booking.getId());
+
+                LambdaUpdateWrapper<TimeSlotEntity> uw = new LambdaUpdateWrapper<>();
+                uw.eq(TimeSlotEntity::getId, slotId)
+                        .eq(TimeSlotEntity::getStatus, 0)
+                        .set(TimeSlotEntity::getStatus, 1)
+                        .set(TimeSlotEntity::getBookingId, booking.getId());
+                int rows = timeSlotMapper.update(null, uw);
+                if (rows == 0) {
+                    throw new CommonJsonException(new OpResultDTO(409L, "时间片[" + slotId + "]已被预约，请重新选择"));
+                }
+
+                BookingCreateResultVO.SlotInfo slotInfo = new BookingCreateResultVO.SlotInfo();
+                slotInfo.setSlotId(slotId);
+                slotInfo.setStartTime(start);
+                slotInfo.setEndTime(end);
+                slotInfo.setAmount(slotAmount);
+                slotInfos.add(slotInfo);
+            }
+
+            BigDecimal depositAmount = totalAmount.multiply(DEPOSIT_RATIO).setScale(2, RoundingMode.HALF_UP);
+
+            long timeoutMillis = 15 * 60 * 1000L;
+            for (Long bookingId : bookingIds) {
+                delayedProducer.sendDelayedMessage(
+                        "BOOKING_TIMEOUT:" + bookingId,
+                        timeoutMillis
+                );
+                log.info("已发送超时违约延迟消息: bookingId={}, 延迟={}ms", bookingId, timeoutMillis);
+            }
+
+            BookingCreateResultVO vo = new BookingCreateResultVO();
+            vo.setBookingIds(bookingIds);
+            vo.setCourtName(court.getName());
+            vo.setSlots(slotInfos);
+            vo.setTotalAmount(totalAmount);
+            vo.setDepositAmount(depositAmount);
+            vo.setStatus(0);
+            vo.setExpireTime(LocalDateTime.now().plusMinutes(15));
+            return vo;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new CommonJsonException(new OpResultDTO(500L, "预约过程被中断，请重试"));
+        } finally {
+            for (RLock lock : acquiredLocks) {
+                if (lock.isHeldByCurrentThread()) {
+                    lock.unlock();
+                }
+            }
         }
-
-        BookingCreateResultVO vo = new BookingCreateResultVO();
-        vo.setBookingIds(bookingIds);
-        vo.setCourtName(court.getName());
-        vo.setSlots(slotInfos);
-        vo.setTotalAmount(totalAmount);
-        vo.setDepositAmount(depositAmount);
-        vo.setStatus(0);
-        vo.setExpireTime(LocalDateTime.now().plusMinutes(15));
-        return vo;
     }
 
     @Override

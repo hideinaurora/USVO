@@ -39,7 +39,6 @@ public class TimeSlotDateSyncTask implements ApplicationRunner {
         LocalDate today = LocalDate.now();
 
         QueryWrapper<TimeSlotEntity> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("status", 0);
 
         List<TimeSlotEntity> allSlots = timeSlotMapper.selectList(queryWrapper);
 
