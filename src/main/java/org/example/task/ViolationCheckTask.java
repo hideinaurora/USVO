@@ -11,7 +11,6 @@ import org.example.mapper.basic.user.UserMapper;
 import org.example.mapper.booking.BookingMapper;
 import org.example.mapper.booking.PaymentMapper;
 import org.example.mapper.booking.TimeSlotMapper;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,41 +33,41 @@ public class ViolationCheckTask {
     @Resource
     private UserMapper userMapper;
 
-    @Scheduled(cron = "0 */10 * * * ?")
     @Transactional(rollbackFor = Exception.class)
-    public void checkNoShowBookings() {
-        log.info("【违约检查任务】开始执行");
+    public boolean checkAndProcessBreach(Long bookingId) {
+        log.info("【违约检查任务】开始执行, bookingId={}", bookingId);
+
+        BookingEntity booking = bookingMapper.selectById(bookingId);
+        if (booking == null) {
+            log.warn("【违约检查任务】预约不存在, bookingId={}", bookingId);
+            return false;
+        }
+
+        if (booking.getStatus() == null || booking.getStatus() != 1) {
+            log.warn("【违约检查任务】预约状态不是已预约, bookingId={}, status={}", bookingId, booking.getStatus());
+            return false;
+        }
+
+        if (booking.getEndTime() == null) {
+            log.warn("【违约检查任务】预约结束时间为空, bookingId={}", bookingId);
+            return false;
+        }
+
         LocalDateTime now = LocalDateTime.now();
+        LocalDateTime checkinTime = booking.getCheckinTime();
+        LocalDateTime graceEndTime = booking.getEndTime().plusHours(1);
 
-        QueryWrapper<BookingEntity> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("status", 1);
+        boolean isBreach = (checkinTime == null && now.isAfter(graceEndTime))
+                || (checkinTime != null && checkinTime.isAfter(graceEndTime));
 
-        List<BookingEntity> activeBookings = bookingMapper.selectList(queryWrapper);
-
-        if (activeBookings == null || activeBookings.isEmpty()) {
-            log.info("【违约检查任务】没有待处理的预约");
-            return;
+        if (isBreach) {
+            processBreach(booking);
+            log.info("【违约检查任务】已处理违约, bookingId={}", bookingId);
+            return true;
+        } else {
+            log.info("【违约检查任务】不构成违约, bookingId={}", bookingId);
+            return false;
         }
-
-        int breachCount = 0;
-        for (BookingEntity booking : activeBookings) {
-            if (booking.getEndTime() == null) {
-                continue;
-            }
-
-            LocalDateTime checkinTime = booking.getCheckinTime();
-            LocalDateTime graceEndTime = booking.getEndTime().plusHours(1);
-
-            boolean isBreach = (checkinTime == null && now.isAfter(graceEndTime))
-                    || (checkinTime != null && checkinTime.isAfter(graceEndTime));
-
-            if (isBreach) {
-                processBreach(booking);
-                breachCount++;
-            }
-        }
-
-        log.info("【违约检查任务】执行完成，共处理{}个违约预约", breachCount);
     }
 
     private void processBreach(BookingEntity booking) {
@@ -96,12 +95,23 @@ public class ViolationCheckTask {
             UserEntity user = userMapper.selectById(booking.getUserId());
             if (user != null) {
                 int currentViolation = user.getViolationCount() != null ? user.getViolationCount() : 0;
+                int currentCreditScore = user.getCreditScore() != null ? user.getCreditScore() : 100;
+                int newCreditScore = Math.max(0, currentCreditScore - 10);
+
                 LambdaUpdateWrapper<UserEntity> uw = new LambdaUpdateWrapper<>();
                 uw.eq(UserEntity::getId, user.getId())
-                        .set(UserEntity::getViolationCount, currentViolation + 1);
+                        .set(UserEntity::getViolationCount, currentViolation + 1)
+                        .set(UserEntity::getCreditScore, newCreditScore);
+
+                if (newCreditScore <= 0) {
+                    uw.set(UserEntity::getUserStatus, 0);
+                    log.warn("【违约检查任务】用户信誉积分归零，已被禁用: userId={}", user.getId());
+                }
+
                 userMapper.update(null, uw);
-                log.info("【违约检查任务】用户违约次数+1: userId={}, 当前违约次数={}",
-                        user.getId(), currentViolation + 1);
+
+                log.info("【违约检查任务】用户违约+1, 积分-10: userId={}, 违约次数={}, 信誉积分={}",
+                        user.getId(), currentViolation + 1, newCreditScore);
             }
         }
     }

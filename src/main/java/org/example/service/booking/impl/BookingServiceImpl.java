@@ -27,6 +27,7 @@ import org.example.mapper.venue.CourtMapper;
 import org.example.mapper.venue.VenueMapper;
 import org.example.service.basic.user.UserService;
 import org.example.service.booking.BookingService;
+import org.example.task.ViolationCheckTask;
 import org.example.vo.booking.AvailableSlotVO;
 import org.example.vo.booking.BookingCreateResultVO;
 import org.example.vo.booking.BookingDetailVO;
@@ -79,6 +80,8 @@ public class BookingServiceImpl implements BookingService {
     private org.example.mq.delayed.DelayedProducer delayedProducer;
     @Resource
     private RedissonClient redissonClient;
+    @Resource
+    private ViolationCheckTask violationCheckTask;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -676,6 +679,13 @@ public class BookingServiceImpl implements BookingService {
             log.warn("预约完成回调失败: 预约状态不是已预约, bookingId={}, status={}", bookingId, booking.getStatus());
             return;
         }
+
+        boolean isBreach = violationCheckTask.checkAndProcessBreach(bookingId);
+        if (isBreach) {
+            log.info("预约完成回调: 用户违约已处理, bookingId={}", bookingId);
+            return;
+        }
+
         BookingEntity bu = new BookingEntity();
         bu.setId(bookingId);
         bu.setStatus(3);
