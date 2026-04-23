@@ -93,3 +93,11 @@ wechat:
   miniapp:
     appid: wxc95d7055b5724a1c
     secret: f9d537cbaf55b13a9819ee63072cdbd4
+
+
+#阿里云OSS
+aliyun:
+  oss:
+    endpoint: https://oss-cn-beijing.aliyuncs.com
+    bucketName: glorysword
+    region: cn-beijing
