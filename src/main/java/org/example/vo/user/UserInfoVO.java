@@ -16,5 +16,6 @@ public class UserInfoVO {
     private Integer status;
     private LocalDateTime lastLoginTime;
     private String phone;
+    private String avatarUrl;
 }
 

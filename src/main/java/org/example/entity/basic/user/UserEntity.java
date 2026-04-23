@@ -93,7 +93,7 @@ public class UserEntity implements Serializable {
     @TableField(value = "credit_score")
     private Integer creditScore;
 
-
-
+    @TableField(value = "avatar_url")
+    private String avatarUrl;
 
 }

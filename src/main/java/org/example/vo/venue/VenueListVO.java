@@ -20,6 +20,8 @@ public class VenueListVO {
     private String openTime;
     private String closeTime;
 
+    private String previewUrl;
+
     @Schema(description = "距离（公里），未传坐标时为null")
     private Double distance;
 

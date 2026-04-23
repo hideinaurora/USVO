@@ -45,4 +45,8 @@ public class VenueAddDTO {
     @JsonProperty("close_time")
     @Schema(description = "关闭时间 (HH:mm:ss)", required = true)
     private String closeTime;
+
+    @JsonProperty("preview_url")
+    @Schema(description = "预览图URL")
+    private String previewUrl;
 }

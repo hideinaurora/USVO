@@ -44,6 +44,9 @@ public class VenueEntity implements Serializable {
     @TableField("close_time")
     private String closeTime;
 
+    @TableField("preview_url")
+    private String previewUrl;
+
     @TableField("status")
     private Integer status;
 

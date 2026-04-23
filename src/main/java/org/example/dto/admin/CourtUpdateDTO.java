@@ -20,6 +20,10 @@ public class CourtUpdateDTO {
     @Schema(description = "每小时价格")
     private BigDecimal pricePerHour;
 
+    @JsonProperty("preview_url")
+    @Schema(description = "预览图URL")
+    private String previewUrl;
+
     @JsonProperty("status")
     @Schema(description = "状态")
     private Integer status;

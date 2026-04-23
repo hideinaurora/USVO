@@ -14,5 +14,8 @@ public class UpdateUserInfoDTO {
 
     @Schema(description = "微信ID（可选）", example = "wx_openid_123456")
     private String wxId;
+
+    @Schema(description = "用户头像URL", example = "https://oss.example.com/avatar.png")
+    private String avatarUrl;
 }
 

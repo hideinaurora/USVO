@@ -34,6 +34,9 @@ public class CourtEntity implements Serializable {
     @TableField("price_per_hour")
     private BigDecimal pricePerHour;
 
+    @TableField("preview_url")
+    private String previewUrl;
+
     @TableField("status")
     private Integer status;
 

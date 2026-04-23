@@ -129,6 +129,7 @@ public class AppController {
             vo.setStatus(user.getUserStatus());
             vo.setLastLoginTime(user.getLastLoginTime());
             vo.setPhone(user.getPhone());
+            vo.setAvatarUrl(user.getAvatarUrl());
             return ApiResponse.success(vo);
         } catch (CommonJsonException e) {
             throw e;
@@ -152,6 +153,7 @@ public class AppController {
             if (dto != null) {
                 update.setUserName(dto.getUserName());
                 update.setWxId(dto.getWxId());
+                update.setAvatarUrl(dto.getAvatarUrl());
             }
             boolean ok = userService.updateById(update);
             if (!ok) {

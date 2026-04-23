@@ -24,4 +24,6 @@ public class VenueListItemVO {
     private Integer status;
 
     private Integer courtCount;
+
+    private String previewUrl;
 }

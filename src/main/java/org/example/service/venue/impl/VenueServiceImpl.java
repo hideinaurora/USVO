@@ -131,6 +131,7 @@ public class VenueServiceImpl implements VenueService {
             cvo.setName(c.getName());
             cvo.setType(c.getType());
             cvo.setPricePerHour(c.getPricePerHour());
+            cvo.setPreviewUrl(c.getPreviewUrl());
             return cvo;
         }).collect(Collectors.toList());
         vo.setCourts(courtVos);
@@ -220,6 +221,7 @@ public class VenueServiceImpl implements VenueService {
             vo.setType(c.getType());
             vo.setPricePerHour(c.getPricePerHour());
             vo.setStatus(c.getStatus());
+            vo.setPreviewUrl(c.getPreviewUrl());
             if (c.getCreateTime() != null) {
                 vo.setCreateTime(c.getCreateTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
             }
@@ -246,6 +248,7 @@ public class VenueServiceImpl implements VenueService {
         court.setName(dto.getName());
         court.setType(dto.getType());
         court.setPricePerHour(dto.getPricePerHour());
+        court.setPreviewUrl(dto.getPreviewUrl());
         court.setStatus(1);
         courtMapper.insert(court);
         return court.getId();
@@ -265,6 +268,9 @@ public class VenueServiceImpl implements VenueService {
         }
         if (dto.getPricePerHour() != null) {
             wrapper.set(CourtEntity::getPricePerHour, dto.getPricePerHour());
+        }
+        if (dto.getPreviewUrl() != null) {
+            wrapper.set(CourtEntity::getPreviewUrl, dto.getPreviewUrl());
         }
         if (dto.getStatus() != null) {
             wrapper.set(CourtEntity::getStatus, dto.getStatus());
@@ -309,6 +315,7 @@ public class VenueServiceImpl implements VenueService {
             vo.setOpenTime(v.getOpenTime());
             vo.setCloseTime(v.getCloseTime());
             vo.setStatus(v.getStatus());
+            vo.setPreviewUrl(v.getPreviewUrl());
             vo.setCourtCount(courtCountMap.getOrDefault(v.getId(), 0L).intValue());
             return vo;
         }).collect(Collectors.toList());
@@ -325,6 +332,7 @@ public class VenueServiceImpl implements VenueService {
         venue.setLongitude(dto.getLongitude());
         venue.setOpenTime(dto.getOpenTime());
         venue.setCloseTime(dto.getCloseTime());
+        venue.setPreviewUrl(dto.getPreviewUrl());
         venue.setStatus(1);
         venueMapper.insert(venue);
         return venue.getId();
@@ -359,6 +367,9 @@ public class VenueServiceImpl implements VenueService {
         }
         if (dto.getCloseTime() != null) {
             wrapper.set(VenueEntity::getCloseTime, dto.getCloseTime());
+        }
+        if (dto.getPreviewUrl() != null) {
+            wrapper.set(VenueEntity::getPreviewUrl, dto.getPreviewUrl());
         }
         if (dto.getStatus() != null) {
             wrapper.set(VenueEntity::getStatus, dto.getStatus());

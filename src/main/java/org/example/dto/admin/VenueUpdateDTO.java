@@ -40,6 +40,10 @@ public class VenueUpdateDTO {
     @Schema(description = "关闭时间 (HH:mm:ss)")
     private String closeTime;
 
+    @JsonProperty("preview_url")
+    @Schema(description = "预览图URL")
+    private String previewUrl;
+
     @JsonProperty("status")
     @Schema(description = "状态")
     private Integer status;

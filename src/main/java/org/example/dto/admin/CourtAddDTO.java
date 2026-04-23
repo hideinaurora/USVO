@@ -32,4 +32,8 @@ public class CourtAddDTO {
     @JsonProperty("price_per_hour")
     @Schema(description = "每小时价格", required = true)
     private BigDecimal pricePerHour;
+
+    @JsonProperty("preview_url")
+    @Schema(description = "预览图URL")
+    private String previewUrl;
 }

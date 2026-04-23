@@ -14,5 +14,6 @@ public class CourtSimpleVO {
     private String name;
     private String type;
     private BigDecimal pricePerHour;
+    private String previewUrl;
 }
 

@@ -21,6 +21,8 @@ public class VenueDetailVO {
     private String closeTime;
     private Integer status;
 
+    private String previewUrl;
+
     private List<CourtSimpleVO> courts;
 }
 

@@ -239,6 +239,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserEntity> impleme
             vo.setViolationCount(user.getViolationCount() != null ? user.getViolationCount() : 0);
             vo.setCreditScore(user.getCreditScore() != null ? user.getCreditScore() : 100);
             vo.setStatus(user.getUserStatus());
+            vo.setAvatarUrl(user.getAvatarUrl());
             if (user.getGmtModify() != null) {
                 vo.setCreateTime(user.getGmtModify().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
             } else {
