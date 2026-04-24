@@ -44,6 +44,13 @@ public class AdminServiceImpl extends ServiceImpl<AdminMapper, AdminEntity> impl
     @Resource
     private RedisUtil redisUtil;
 
+    /**
+     * 管理端用户登录
+     *
+     * @param loginRequest 登录请求参数，包含用户名、密码、验证码Key和验证码
+     * @return 登录成功响应，包含AccessToken、RefreshToken和用户信息
+     * @throws CommonJsonException 参数缺失、验证码错误、用户不存在/禁用或密码错误时抛出异常
+     */
     @Override
     public LoginResponseVO login(LoginRequestDTO loginRequest) {
         // 1. 参数校验
@@ -121,6 +128,11 @@ public class AdminServiceImpl extends ServiceImpl<AdminMapper, AdminEntity> impl
         return response;
     }
 
+    /**
+     * 生成并获取图形验证码
+     *
+     * @return 包含验证码Key和Base64图片信息的对象
+     */
     @Override
     public CaptchaVO generateCaptcha() {
         // 1. 生成验证码
@@ -143,6 +155,13 @@ public class AdminServiceImpl extends ServiceImpl<AdminMapper, AdminEntity> impl
         return captchaVO;
     }
 
+    /**
+     * 使用RefreshToken刷新AccessToken
+     *
+     * @param refreshToken 刷新令牌
+     * @return 包含新的AccessToken和RefreshToken的响应
+     * @throws CommonJsonException 令牌过期、不存在或用户状态异常时抛出异常
+     */
     @Override
     public LoginResponseVO refreshToken(String refreshToken) {
         // 1. 参数校验
