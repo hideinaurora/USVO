@@ -261,7 +261,7 @@ public class AppUserServiceImpl implements AppUserService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ApplyResponseVO applyActivity(Long userId, ApplyRequestDTO request) {
-        // 1. 幂等性校验：使用 userId + applyId 作为 key
+        // 1.  幂等性校验：使用 userId + applyId 作为 key
         String idempotentKey = APPLY_IDEMPOTENT_PREFIX + userId + ":" + request.getApplyId();
         boolean hasKey = redisUtil.exists(idempotentKey);
         if (hasKey) {
