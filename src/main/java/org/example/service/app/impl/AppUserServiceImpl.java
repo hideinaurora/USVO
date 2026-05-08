@@ -70,7 +70,7 @@ public class AppUserServiceImpl implements AppUserService {
 
     @Override
     public List<ActivityVO> getActivityListForApp(Long userId) {
-        // 1.  查询所有活动
+        // 1. 查询所有活动
         QueryWrapper<ApplyEntity> queryWrapper = new QueryWrapper<>();
         queryWrapper.orderByDesc("gmt_create");
         List<ApplyEntity> allActivities = applyService.list(queryWrapper);
@@ -79,7 +79,7 @@ public class AppUserServiceImpl implements AppUserService {
             return new ArrayList<>();
         }
 
-        // 2.  查询用户的所有报名记录
+        // 2. 查询用户的所有报名记录
         QueryWrapper<ApplyUserEntity> userApplyWrapper = new QueryWrapper<>();
         userApplyWrapper.eq("user_id", userId);
         List<ApplyUserEntity> userApplyList = applyUserService.list(userApplyWrapper);
