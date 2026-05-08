@@ -68,7 +68,7 @@ public class TimeSlotDateSyncTask implements ApplicationRunner {
 
         log.info("【时间片同步任务】执行完成，共生成{}个时间片", totalGenerated);
     }
-
+//22
     private int syncCourtTimeSlots(Long courtId, LocalDate today) {
         CourtEntity court = courtMapper.selectById(courtId);
         if (court == null) {
