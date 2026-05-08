@@ -9,19 +9,29 @@ import java.util.Enumeration;
 import java.util.List;
 
 /**
- * 本后台接口系统常用的json工具类
+ * 通用 JSON 响应封装工具类
+ * 提供成功、失败响应的标准化 JSON 格式封装，以及请求参数处理、分页参数封装等功能
+ *
+ * @author ckd
+ * @since 2026-03-13
  */
 public class CommonUtil {
 
     /**
-     * 返回一个info为空对象的成功消息的json
+     * 返回一个 info 为空对象的成功消息的 json
+     * 默认状态码 200，消息 "success"
+     *
+     * @return JSONObject 成功响应对象
      */
     public static JSONObject successJson() {
         return successJson(new JSONObject());
     }
 
     /**
-     * 返回一个返回码为200的json
+     * 返回一个包含结果数据的成功消息的 json
+     *
+     * @param info 结果数据对象
+     * @return JSONObject 成功响应对象
      */
     public static JSONObject successJson(Object info) {
         JSONObject resultJson = new JSONObject();
@@ -32,7 +42,10 @@ public class CommonUtil {
     }
 
     /**
-     * 返回错误信息JSON
+     * 根据错误枚举返回错误信息 JSON
+     *
+     * @param errorEnum 错误码枚举
+     * @return JSONObject 错误响应对象
      */
     public static JSONObject errorJson(ErrorEnum errorEnum) {
         JSONObject resultJson = new JSONObject();
@@ -44,7 +57,10 @@ public class CommonUtil {
 
     /**
      * 自定义返回异常说明
+     * 默认错误码 10099
      *
+     * @param msg 异常提示信息
+     * @return JSONObject 错误响应对象
      * @author ckd
      * @date 2022/5/17 9:10 下午
      */
@@ -56,6 +72,13 @@ public class CommonUtil {
         return resultJson;
     }
 
+    /**
+     * 自定义错误码和消息的响应
+     *
+     * @param errCode 错误码
+     * @param msg 错误消息
+     * @return JSONObject 错误响应对象
+     */
     public static JSONObject errorJsonStr(Integer errCode, String msg) {
         JSONObject resultJson = new JSONObject();
         resultJson.put("status", errCode);
@@ -67,9 +90,10 @@ public class CommonUtil {
     /**
      * 查询分页结果后的封装工具方法
      *
-     * @param requestJson 请求参数json,此json在之前调用fillPageParam 方法时,已经将pageRow放入
-     * @param list        查询分页对象list
+     * @param requestJson 请求参数 json, 此 json 在之前调用 fillPageParam 方法时, 已经将 pageRow 放入
+     * @param list        查询分页对象 list
      * @param totalCount  查询出记录的总条数
+     * @return JSONObject 包含分页列表和统计信息的成功响应对象
      */
     public static JSONObject successPage(final JSONObject requestJson, List<JSONObject> list, int totalCount) {
         int pageRow = requestJson.getIntValue("pageRow");
@@ -84,9 +108,11 @@ public class CommonUtil {
     }
 
     /**
-     * 查询分页结果后的封装工具方法
+     * 查询分页结果后的简单封装方法
+     * 仅包含数据列表，不包含总页数等统计信息
      *
-     * @param list 查询分页对象list
+     * @param list 查询分页对象 list
+     * @return JSONObject 包含列表的成功响应对象
      */
     public static JSONObject successPage(List<JSONObject> list) {
         JSONObject result = successJson();
@@ -97,10 +123,11 @@ public class CommonUtil {
     }
 
     /**
-     * 获取总页数
+     * 计算总页数
      *
      * @param pageRow   每页行数
      * @param itemCount 结果的总条数
+     * @return 总页数
      */
     private static int getPageCounts(int pageRow, int itemCount) {
         if (itemCount == 0) {
@@ -112,7 +139,11 @@ public class CommonUtil {
     }
 
     /**
-     * 将request参数值转为json
+     * 将 HttpServletRequest 中的 Parameter 转换为 JSONObject
+     * 支持多值参数，使用逗号分隔
+     *
+     * @param request HTTP 请求对象
+     * @return 转换后的 JSON 对象
      */
     public static JSONObject request2Json(HttpServletRequest request) {
         JSONObject requestJson = new JSONObject();
@@ -135,11 +166,12 @@ public class CommonUtil {
     }
 
     /**
-     * 获取json字符串
+     * 从请求输入流中获取 JSON 字符串并解析为 JSONObject
+     * 常用于处理 POST 请求中的 application/json 数据
      *
-     * @param req
-     * @return
-     * @throws Exception
+     * @param req HTTP 请求对象
+     * @return 解析后的 JSON 对象
+     * @throws Exception 流读取或解析异常
      */
     public static JSONObject getJsonObject(HttpServletRequest req) throws Exception {
         ServletInputStream is;
@@ -159,10 +191,11 @@ public class CommonUtil {
 
 
     /**
-     * 获取字符串请求
+     * 从请求输入流中获取原始字符串请求体
      *
-     * @return String
-     * @throws Exception
+     * @param req HTTP 请求对象
+     * @return 原始请求体字符串
+     * @throws Exception 流读取异常
      * @author ckd
      * @date 2021/12/1 3:31 下午
      */
@@ -182,10 +215,11 @@ public class CommonUtil {
     }
 
     /**
-     * 在分页查询之前,为查询条件里加上分页参数
+     * 在分页查询之前, 为查询条件里加上分页参数
+     * 计算数据库查询的 offSet 偏移量
      *
-     * @param paramObject    查询条件json
-     * @param defaultPageRow 默认的每页条数,即前端不传pageRow参数时的每页条数
+     * @param paramObject    查询条件 json
+     * @param defaultPageRow 默认的每页条数, 即前端不传 pageRow 参数时的每页条数
      */
     private static void fillPageParam(final JSONObject paramObject, int defaultPageRow) {
         int pageNum = paramObject.getIntValue("pageNum");
@@ -195,13 +229,16 @@ public class CommonUtil {
         paramObject.put("offSet", (pageNum - 1) * pageRow);
         paramObject.put("pageRow", pageRow);
         paramObject.put("pageNum", pageNum);
-        //删除此参数,防止前端传了这个参数,pageHelper分页插件检测到之后,拦截导致SQL错误
+        // 删除此参数, 防止前端传了这个参数, pageHelper 分页插件检测到之后, 拦截导致 SQL 错误
         paramObject.remove("pageSize");
     }
 
     /**
-     * 信息**加密
+     * 信息脱敏处理（前3后3，中间用 **** 代替）
+     * 适用于手机号、证件号等隐私信息的简单脱敏
      *
+     * @param info 原始信息
+     * @return 脱敏后的信息
      * @author ckd
      * @date 2022/3/17 7:49 下午
      */
@@ -214,8 +251,9 @@ public class CommonUtil {
     }
 
     /**
-     * 分页查询之前的处理参数
-     * 没有传pageRow参数时,默认每页10条.
+     * 分页查询之前的参数预处理（默认每页10条）
+     *
+     * @param paramObject 查询条件 JSON 对象
      */
     public static void fillPageParam(final JSONObject paramObject) {
         fillPageParam(paramObject, 10);
