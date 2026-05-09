@@ -96,11 +96,11 @@ public class TimeSlotServiceImpl implements TimeSlotService {
             throw new CommonJsonException(new OpResultDTO(400L, "时间粒度必须在1-1440分钟之间"));
         }
 
-        // 4. 获取场馆营业时间，作为生成的上下界限制
+        // 4.   获取场馆营业时间，作为生成的上下界限制
         LocalTime venueOpenTime = LocalTime.parse(venue.getOpenTime(), TIME_FMT);
         LocalTime venueCloseTime = LocalTime.parse(venue.getCloseTime(), TIME_FMT);
 
-        // 5. 确定每日生成的时间窗口：取用户指定时间与场馆营业时间的交集
+        // 5.   确定每日生成的时间窗口：取用户指定时间与场馆营业时间的交集
         LocalTime dayStartTime = StringUtils.isNotBlank(dto.getStartTime())
                 ? LocalTime.parse(dto.getStartTime(), TIME_FMT) : venueOpenTime;
         LocalTime dayEndTime = StringUtils.isNotBlank(dto.getEndTime())
@@ -122,7 +122,7 @@ public class TimeSlotServiceImpl implements TimeSlotService {
         int totalGenerated = 0;
         int skipped = 0;
 
-        // 6. 核心生成逻辑：双层循环（日期 -> 时间段）
+        // 6.   核心生成逻辑：双层循环（日期 -> 时间段）
         LocalDate current = startDate;
         while (!current.isAfter(endDate)) {
             LocalTime slotStart = dayStartTime;
