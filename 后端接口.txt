@@ -31,6 +31,7 @@
 2.4 获取可预约时间片接口路径: GET /api/court/{courtId}/slots
 请求参数:参数 类型 必填 说明date string 是 日期 (YYYY-MM-DD)
 响应示例:{"code": 200,"data": {"court_id": 1,"court_name": "篮球场 1 号","price_per_hour": 50.00,"date": "2026-04-03","slots": [{"id": 1,"start_time": "10:00:00","end_time": "11:00:00","status": 2,"status_text": "已预约"},{"id": 2,"start_time": "11:00:00","end_time": "12:00:00","status": 0,"status_text": "可预约"},{"id": 3,"start_time": "12:00:00","end_time": "13:00:00","status": 0,"status_text": "可预约"}]}}
+IIIII
 ================================================================================三、预约模块================================================================================
 3.1 创建预约接口路径: POST /api/booking/create请求头: Authorization: Bearer {token}说明: 当前实现为事务内校验+更新时间片，未接悲观锁与超时取消MQ
 请求参数:{"court_id": 1,"slot_id": 2}

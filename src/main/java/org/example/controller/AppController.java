@@ -105,6 +105,9 @@ public class AppController {
 //            log.error("微信登录失败", e);
 //            throw new CommonJsonException("微信登录失败，请稍后重试");
 //        }
+
+
+//HI
 //    }
 
     @Operation(summary = "获取用户信息", description = "获取当前登录用户的基础信息",
