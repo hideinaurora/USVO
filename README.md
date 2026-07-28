@@ -1,8 +1,8 @@
-# 报名管理系统 API 文档
+# 高校场馆场地预约系统 API 文档
 
 ## 项目简介
 
-本项目是一个基于 Spring Boot 的活动报名管理系统，提供管理端和移动端两套 API 接口。系统支持活动发布、用户报名、在线支付、退款管理等功能，并使用分布式锁保证高并发场景下的名额管理。
+本项目是一个基于 Spring Boot 的高校场馆场地预约系统，提供管理端和移动端两套 API 接口。系统支持场馆管理、场地预约、时间片管理、押金支付、人脸识别签到、违约记录等功能，并使用分布式锁保证高并发场景下的场地预约管理。
 
 ## 技术栈
 
@@ -17,6 +17,8 @@
 | RabbitMQ | - | 消息队列 |
 | Swagger (OpenAPI 3.0) | 1.7.0 | API 文档 |
 | Kaptcha | 0.0.9 | 验证码生成 |
+| Face++ | - | 人脸识别服务 |
+| Alibaba Cloud OSS | - | 对象存储服务 |
 
 ## 项目结构
 
@@ -42,22 +44,32 @@ src/main/java/org/example/
 │   │   ├── GlobalExceptionHandler.java # 全局异常处理器
 │   │   ├── UnauthenticatedException.java # 未认证异常
 │   │   └── UnauthorizedException.java   # 未授权异常
+│   ├── FaceServiceConfig.java   # 人脸识别服务配置
 │   ├── MybatisPlusConfig.java   # MyBatis Plus 配置
 │   ├── RedisConfig.java         # Redis 配置
 │   └── SwaggerConfig.java       # Swagger 配置
 ├── controller/                   # 控制器层
 │   ├── AdminController.java     # 管理端用户接口
 │   ├── AppController.java       # 移动端用户接口
-│   ├── ApplyController.java     # 活动管理接口
+│   ├── ApplyController.java     # 活动管理接口（已停用）
+│   ├── BookingController.java   # 预约模块接口
+│   ├── CourtController.java     # 场地时间片接口
+│   ├── DepositPaymentController.java # 押金支付接口
+│   ├── DifyController.java      # Dify智能体查询接口（已停用）
+│   ├── FaceController.java      # 人脸识别接口
+│   ├── MqController.java        # 消息队列回调接口（已停用）
 │   ├── PaymentCallbackController.java # 支付回调接口
 │   ├── RefundController.java    # 退款管理接口
+│   ├── UploadController.java    # 文件上传接口
+│   ├── VenueController.java     # 场馆模块接口
 │   └── WechatController.java    # 微信接口
 ├── dto/                          # 数据传输对象
 ├── entity/                       # 实体类
-│   ├── activity/                # 活动相关实体
-│   ├── basic/                   # 基础实体
+│   ├── activity/                # 活动相关实体（已停用）
+│   ├── basic/                   # 基础实体（用户、违约记录）
+│   ├── booking/                 # 预约相关实体（预约、时间片、支付、签到日志）
 │   ├── failed/                  # 失败记录实体
-│   └── sys/                     # 系统实体
+│   └── sys/                     # 系统实体（管理员）
 ├── mapper/                       # 数据访问层
 ├── service/                      # 业务逻辑层
 ├── mq/                          # 消息队列
@@ -95,12 +107,17 @@ Swagger 配置位于 `org.example.config.SwaggerConfig`，当前配置信息：
 
 Swagger 文档按 Controller 的 `@Tag` 注解自动分组：
 
-1. **管理端用户** - 管理员登录、验证码、令牌刷新
-2. **移动端用户** - 用户注册、登录、活动查询、报名、退款申请
-3. **活动管理** - 活动的增删改查、名额管理
-4. **退款管理** - 退款审核、查询
-5. **支付回调** - 支付结果通知
-6. **微信** - 微信登录
+1. **管理端用户** - 管理员登录、验证码、令牌刷新、用户管理、场馆管理、场地管理、预约管理、时间片管理
+2. **移动端用户** - 用户注册、登录、信息查询、违约记录查询、退款申请
+3. **场馆模块** - 场馆列表、详情、按类型/关键词筛选、距离排序
+4. **场地时间片** - 可预约时间片查询
+5. **预约模块** - 创建预约、取消、列表、详情、签到
+6. **押金支付** - 预约押金支付
+7. **人脸识别模块** - 人脸特征提取、人脸验证
+8. **微信接口** - 微信小程序登录
+9. **退款管理** - 退款审核、查询
+10. **支付回调** - 支付结果通知
+11. **文件上传** - 阿里云OSS文件上传
 
 ## 接口说明
 
@@ -138,6 +155,26 @@ Authorization: eyJhbGciOiJIUzI1NiJ9...
 | `/api/admin/login` | POST | 管理员登录 | 公开 |
 | `/api/admin/captcha` | GET | 获取验证码 | 公开 |
 | `/api/admin/refresh-token` | POST | 刷新令牌 | 公开 |
+| `/api/admin/user/list` | GET | 获取用户列表 | ADMIN |
+| `/api/admin/user/{userId}` | DELETE | 删除用户 | ADMIN |
+| `/api/admin/user/{userId}/status` | PUT | 禁用/启用用户 | ADMIN |
+| `/api/admin/venue/list` | GET | 获取场馆列表 | ADMIN |
+| `/api/admin/venue` | POST | 添加场馆 | ADMIN |
+| `/api/admin/venue/{venueId}` | PUT | 修改场馆 | ADMIN |
+| `/api/admin/venue/{venueId}` | DELETE | 删除场馆 | ADMIN |
+| `/api/admin/court/list` | GET | 获取场地列表 | ADMIN |
+| `/api/admin/court` | POST | 添加场地 | ADMIN |
+| `/api/admin/court/{courtId}` | PUT | 修改场地 | ADMIN |
+| `/api/admin/court/{courtId}` | DELETE | 删除场地 | ADMIN |
+| `/api/admin/booking/list` | GET | 获取预约列表 | ADMIN |
+| `/api/admin/booking/{bookingId}` | DELETE | 删除预约 | ADMIN |
+| `/api/admin/booking/{bookingId}/force-cancel` | POST | 强制取消预约 | ADMIN |
+| `/api/admin/timeslot/generate` | POST | 生成时间片 | ADMIN |
+| `/api/admin/timeslot/list` | GET | 时间片列表查询 | ADMIN |
+| `/api/admin/timeslot/{slotId}` | PUT | 更新时间片 | ADMIN |
+| `/api/admin/timeslot/{slotId}` | DELETE | 删除时间片 | ADMIN |
+| `/api/admin/timeslot/batch` | DELETE | 批量删除时间片 | ADMIN |
+| `/api/admin/timeslot/{slotId}/lock` | PUT | 锁定/解锁时间片 | ADMIN |
 
 **登录示例**：
 ```json
@@ -156,52 +193,84 @@ POST /api/admin/login
 |------|------|------|------|
 | `/api/app/register` | POST | 用户注册 | 公开 |
 | `/api/app/login` | POST | 用户登录 | 公开 |
-| `/api/app/activities` | GET | 查询可报名活动列表 | USER |
-| `/api/app/enrolled-activities` | GET | 查询已报名活动列表 | USER |
-| `/api/app/apply` | POST | 用户报名活动 | USER |
+| `/api/app/info` | GET | 获取用户信息 | USER |
+| `/api/app/info` | PUT | 更新用户信息 | USER |
+| `/api/app/violations` | GET | 获取违约记录 | USER |
 | `/api/app/refund/apply` | POST | 申请退款 | USER |
 
-**报名示例**：
-```json
-POST /api/app/apply
-Authorization: <token>
-{
-  "applyId": 1
-}
-```
-
-### 活动管理接口（`/api/apply`）
+### 场馆模块接口（`/api/venue`）
 
 | 接口 | 方法 | 说明 | 权限 |
 |------|------|------|------|
-| `/api/apply/page` | POST | 分页查询活动列表 | ADMIN |
-| `/api/apply/list` | GET | 查询活动列表（不分页） | ADMIN |
-| `/api/apply/{applyId}` | GET | 查询活动详情 | ADMIN,USER |
-| `/api/apply/users/page` | POST | 分页查询报名学生列表 | ADMIN |
-| `/api/apply/users/{applyId}` | GET | 查询报名学生列表 | ADMIN |
-| `/api/apply/add` | POST | 新增活动 | ADMIN |
-| `/api/apply/update` | PUT | 修改活动 | ADMIN |
-| `/api/apply/{applyIds}` | DELETE | 删除活动 | ADMIN |
-| `/api/apply/quota/increase` | PUT | 增加活动名额 | ADMIN |
-| `/api/apply/quota/decrease` | PUT | 减少活动名额 | ADMIN |
-| `/api/apply/quota/{applyId}` | GET | 获取剩余名额 | ADMIN,USER |
+| `/api/venue/list` | GET | 获取场馆列表（支持按类型、关键词筛选，距离排序） | 公开 |
+| `/api/venue/page` | GET | 分页获取场馆列表 | 公开 |
+| `/api/venue/{venueId}` | GET | 获取场馆详情（包含场地列表） | 公开 |
 
-**分页查询示例**：
+**查询场馆示例**：
+```
+GET /api/venue/list?type=basketball&keyword=体育馆&latitude=30.5728&longitude=104.0668
+```
+
+### 场地时间片接口（`/api/court`）
+
+| 接口 | 方法 | 说明 | 权限 |
+|------|------|------|------|
+| `/api/court/{courtId}/slots` | GET | 获取可预约时间片 | 公开 |
+| `/api/court/available-slots` | GET | 获取可预约时间（批量） | 公开 |
+
+### 预约模块接口（`/api/booking`）
+
+| 接口 | 方法 | 说明 | 权限 |
+|------|------|------|------|
+| `/api/booking/create` | POST | 创建预约 | USER |
+| `/api/booking/cancel` | POST | 取消预约 | USER |
+| `/api/booking/list` | GET | 获取我的预约记录 | USER |
+| `/api/booking/{bookingId}` | GET | 获取预约详情 | USER |
+| `/api/booking/checkin` | POST | 签到入场 | USER |
+
+**创建预约示例**：
 ```json
-POST /api/apply/page
+POST /api/booking/create
 Authorization: <token>
 {
-  "pageNum": 1,
-  "pageSize": 10,
-  "name": "活动名称"
+  "courtId": 1,
+  "startTime": "2026-07-28 14:00:00",
+  "endTime": "2026-07-28 16:00:00"
 }
 ```
+
+### 押金支付接口（`/api/payment`）
+
+| 接口 | 方法 | 说明 | 权限 |
+|------|------|------|------|
+| `/api/payment/pay` | POST | 支付押金 | USER |
+
+### 人脸识别接口（`/api/face`）
+
+| 接口 | 方法 | 说明 | 权限 |
+|------|------|------|------|
+| `/api/face/extract` | POST | 提取人脸特征 | USER |
+| `/api/face/verify` | POST | 验证人脸 | USER |
+| `/api/face/health` | GET | 检查人脸服务状态 | 公开 |
+
+### 文件上传接口（`/api/upload`）
+
+| 接口 | 方法 | 说明 | 权限 |
+|------|------|------|------|
+| `/api/upload` | POST | 文件上传（阿里云OSS） | 公开 |
+
+### 微信接口（`/api/wechat`）
+
+| 接口 | 方法 | 说明 | 权限 |
+|------|------|------|------|
+| `/api/wechat/login/code` | POST | 微信小程序登录 | 公开 |
 
 ### 退款管理接口（`/api/refund`）
 
 | 接口 | 方法 | 说明 | 权限 |
 |------|------|------|------|
 | `/api/refund/page` | POST | 分页查询退款列表 | ADMIN |
+| `/api/refund/list` | GET | 查询退款列表（不分页） | ADMIN |
 | `/api/refund/examine` | POST | 退款审核 | ADMIN |
 
 ## 权限校验实现
@@ -229,9 +298,9 @@ public enum ApiAuth {
 在 Controller 方法上添加 `@RequiresPermissions` 注解：
 
 ```java
-@PostMapping("/page")
-@RequiresPermissions(value = "apply:page", apiAuth = {ApiAuth.ADMIN})
-public ApiResponse<PageResult<ApplyDetailVO>> queryPage(@RequestBody ApplyQueryDTO queryDTO) {
+@PostMapping("/create")
+@RequiresPermissions(value = "booking:create", apiAuth = {ApiAuth.USER})
+public ApiResponse<BookingCreateResultVO> create(@Valid @RequestBody BookingCreateDTO dto) {
     // 业务逻辑
 }
 ```
@@ -365,10 +434,12 @@ spring:
 
 主要配置：
 - 服务端口: `9046`
-- MySQL 数据库: `192.168.10.141:33068/nblg_apply`
+- MySQL 数据库: `127.0.0.1:3306/nblg_apply`
 - Redis: `localhost:6379`
-- RabbitMQ: `192.168.10.141:5672`
+- RabbitMQ: `localhost:5672`
+- 人脸识别服务: `http://localhost:5000`
 - 微信小程序 AppId 和 Secret
+- 阿里云 OSS 配置
 
 ## 启动项目
 
@@ -387,7 +458,7 @@ mvn spring-boot:run
 
 ## 数据库
 
-数据库初始化脚本：`all_table.sql`
+数据库初始化脚本：`sql/all_table.sql`
 
 ## 日志
 
@@ -395,4 +466,4 @@ mvn spring-boot:run
 
 ---
 
-**最后更新**: 2026-03-24
+**最后更新**: 2026-06-11

@@ -21,6 +21,7 @@ import org.example.mapper.basic.user.ViolationLogMapper;
 import org.example.service.TokenService;
 import org.example.service.app.AppUserService;
 import org.example.service.basic.user.UserService;
+import org.example.service.face.FaceService;
 import org.example.utils.WxUtils;
 import org.example.vo.ActivityVO;
 import org.example.vo.AppLoginResponseVO;
@@ -36,6 +37,9 @@ import javax.annotation.Resource;
 import javax.validation.Valid;
 import java.util.List;
 import java.util.stream.Collectors;
+
+import org.springframework.web.client.RestTemplate;
+
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 
 /**
@@ -62,6 +66,11 @@ public class AppController {
 
     @Resource
     private ViolationLogMapper violationLogMapper;
+
+    @Resource
+    private FaceService faceService;
+
+    private final RestTemplate restTemplate = new RestTemplate();
 
     @Operation(summary = "用户注册", description = "移动端用户注册，支持账号密码注册，可选择性绑定微信ID。注册成功后自动登录并返回JWT令牌")
     @PostMapping("/register")
@@ -142,7 +151,7 @@ public class AppController {
         }
     }
 
-    @Operation(summary = "更新用户信息", description = "更新当前登录用户的基础信息",
+    @Operation(summary = "更新用户信息", description = "更新当前登录用户的基础信息，支持同时提取人脸特征",
             parameters = {
                     @Parameter(name = "token", description = "JWT访问令牌", required = true, in = ParameterIn.HEADER)
             })
@@ -157,6 +166,36 @@ public class AppController {
                 update.setUserName(dto.getUserName());
                 update.setWxId(dto.getWxId());
                 update.setAvatarUrl(dto.getAvatarUrl());
+
+                // 人脸特征提取逻辑
+                String faceImageBase64 = dto.getFaceImageBase64();
+                
+                // 如果没有单独提供人脸图片Base64，但更新了头像，则从头像URL下载并提取
+                if ((faceImageBase64 == null || faceImageBase64.isEmpty()) 
+                        && dto.getAvatarUrl() != null && !dto.getAvatarUrl().isEmpty()) {
+                    try {
+                        // 下载头像图片并转为Base64
+                        byte[] imageBytes = restTemplate.getForObject(dto.getAvatarUrl(), byte[].class);
+                        if (imageBytes != null && imageBytes.length > 0) {
+                            faceImageBase64 = "data:image/jpeg;base64," + java.util.Base64.getEncoder().encodeToString(imageBytes);
+                            log.info("用户 {} 成功下载头像图片，长度: {} bytes", userId, imageBytes.length);
+                        }
+                    } catch (Exception e) {
+                        log.warn("下载头像图片失败: {}", e.getMessage());
+                    }
+                }
+
+                // 如果有人脸图片，则提取特征
+                if (faceImageBase64 != null && !faceImageBase64.isEmpty()) {
+                    try {
+                        List<Double> feature = faceService.extractFeature(faceImageBase64);
+                        update.setFaceFeature(com.alibaba.fastjson2.JSON.toJSONString(feature));
+                        log.info("用户 {} 成功提取人脸特征", userId);
+                    } catch (Exception e) {
+                        log.warn("提取人脸特征失败: {}", e.getMessage());
+                        // 人脸特征提取失败不影响基本信息更新
+                    }
+                }
             }
             boolean ok = userService.updateById(update);
             if (!ok) {

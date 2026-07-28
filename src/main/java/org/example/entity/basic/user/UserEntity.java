@@ -96,4 +96,10 @@ public class UserEntity implements Serializable {
     @TableField(value = "avatar_url")
     private String avatarUrl;
 
+    /**
+     * 人脸特征向量（512维归一化特征，JSON数组格式存储）
+     */
+    @TableField(value = "face_feature")
+    private String faceFeature;
+
 }

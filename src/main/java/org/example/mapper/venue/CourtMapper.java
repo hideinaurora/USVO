@@ -24,5 +24,11 @@ public interface CourtMapper extends BaseMapper<CourtEntity> {
             "</script>"
     })
     List<VenueCourtCountVO> selectVenueCourtCounts(@Param("venueIds") List<Long> venueIds);
+
+    @Select("SELECT * FROM court WHERE venue_id = #{venueId}")
+    List<CourtEntity> selectByVenueId(@Param("venueId") Long venueId);
+
+    @Select("SELECT * FROM court WHERE type = #{type}")
+    List<CourtEntity> selectByType(@Param("type") String type);
 }
 

@@ -1,0 +1,406 @@
+基本信息
+项目	内容
+接口名称	场馆预约综合查询接口
+接口描述	供 Dify 智能体调用，从真实业务数据库中查询场馆信息、场地价格、空闲时段、预约记录、违约记录等数据
+请求方式	POST
+Content-Type	application/json
+字符编码	UTF-8
+数据库	MySQL 8.2.0
+接口地址	http://your-server-ip:5000/api/venue/query
+请求头（Headers）
+参数名	是否必填	类型	说明
+Content-Type	是	string	固定值：application/json
+Authorization	是	string	API 鉴权密钥，格式：Bearer {your_api_key}
+请求体（Request Body）
+通用参数
+参数名	是否必填	类型	说明
+query_type	是	string	查询类型，见下方枚举
+params	是	object	查询参数，具体字段根据 query_type 而定
+user_id	否	string	调用用户标识，用于日志追踪
+query_type 枚举值
+值	说明	对应数据表
+venue_info	场馆基本信息查询	venue
+court_info	场地信息查询（含价格）	court
+court_availability	场地空闲时段查询	time_slot
+pricing	场地价格查询	court
+booking_rules	预约规则查询	系统规则
+user_bookings	用户历史预约查询	booking
+user_violations	用户违约记录查询	violation_log
+接口详情
+1. 场馆信息查询 (venue_info)
+功能：查询所有场馆或按名称/类型搜索场馆基本信息
+
+请求参数
+
+参数名	是否必填	类型	说明
+keyword	否	string	场馆名称关键词，支持模糊匹配
+type	否	string	场馆类型，如：综合馆、篮球馆、游泳馆、羽毛球馆
+请求示例
+
+json
+{
+    "query_type": "venue_info",
+    "params": {
+        "keyword": "羽毛球"
+    },
+    "user_id": "user_12345"
+}
+响应示例
+
+json
+{
+    "code": 0,
+    "message": "success",
+    "data": [
+        {
+            "venue_id": 4,
+            "venue_name": "羽毛球馆",
+            "type": "羽毛球馆",
+            "address": "东区羽毛球路",
+            "open_time": "08:00:00",
+            "close_time": "22:00:00",
+            "preview_url": null,
+            "status": 1
+        }
+    ]
+}
+2. 场地信息查询 (court_info)
+功能：查询指定场馆下的所有场地及其价格
+
+请求参数
+
+参数名	是否必填	类型	说明
+venue_id	是	bigint	场馆ID
+court_type	否	string	场地类型：basketball、badminton、swimming
+请求示例
+
+json
+{
+    "query_type": "court_info",
+    "params": {
+        "venue_id": 4
+    },
+    "user_id": "user_12345"
+}
+响应示例
+
+json
+{
+    "code": 0,
+    "message": "success",
+    "data": [
+        {
+            "court_id": 8,
+            "court_name": "羽毛球场A",
+            "court_type": "badminton",
+            "price_per_hour": 35.00,
+            "preview_url": null,
+            "venue_name": "羽毛球馆"
+        },
+        {
+            "court_id": 9,
+            "court_name": "羽毛球场B",
+            "court_type": "badminton",
+            "price_per_hour": 35.00,
+            "preview_url": null,
+            "venue_name": "羽毛球馆"
+        }
+    ]
+}
+3. 场地空闲时段查询 (court_availability)
+功能：查询指定场地在指定日期的可预约时段
+
+请求参数
+
+参数名	是否必填	类型	说明
+court_id	是	bigint	场地ID
+slot_date	是	string	查询日期，格式：YYYY-MM-DD
+请求示例
+
+json
+{
+    "query_type": "court_availability",
+    "params": {
+        "court_id": 8,
+        "slot_date": "2026-04-03"
+    },
+    "user_id": "user_12345"
+}
+响应示例
+
+json
+{
+    "code": 0,
+    "message": "success",
+    "data": {
+        "court_id": 8,
+        "court_name": "羽毛球场A",
+        "slot_date": "2026-04-03",
+        "available_slots": [
+            {
+                "slot_id": 100,
+                "start_time": "2026-04-03 10:00:00",
+                "end_time": "2026-04-03 11:00:00",
+                "status": 0
+            }
+        ],
+        "booked_slots": [
+            {
+                "slot_id": 101,
+                "start_time": "2026-04-03 11:00:00",
+                "end_time": "2026-04-03 12:00:00",
+                "booking_id": 1003
+            }
+        ],
+        "locked_slots": []
+    }
+}
+4. 价格查询 (pricing)
+功能：查询指定场地类型或具体场地的收费标准
+
+请求参数
+
+参数名	是否必填	类型	说明
+court_id	否	bigint	场地ID（精确查询）
+court_type	否	string	场地类型：basketball、badminton、swimming
+venue_id	否	bigint	场馆ID
+三个参数至少传一个，优先级：court_id > court_type > venue_id
+
+请求示例
+
+json
+{
+    "query_type": "pricing",
+    "params": {
+        "court_type": "badminton"
+    },
+    "user_id": "user_12345"
+}
+响应示例
+
+json
+{
+    "code": 0,
+    "message": "success",
+    "data": [
+        {
+            "court_id": 3,
+            "court_name": "羽毛球场1号",
+            "court_type": "badminton",
+            "price_per_hour": 30.00,
+            "venue_name": "南校区体育中心"
+        },
+        {
+            "court_id": 8,
+            "court_name": "羽毛球场A",
+            "court_type": "badminton",
+            "price_per_hour": 35.00,
+            "venue_name": "羽毛球馆"
+        }
+    ]
+}
+5. 预约规则查询 (booking_rules)
+功能：查询系统的预约、取消、违约规则
+
+请求参数
+
+参数名	是否必填	类型	说明
+rule_type	否	string	规则类型：all、booking、cancel、violation、checkin，默认 all
+请求示例
+
+json
+{
+    "query_type": "booking_rules",
+    "params": {
+        "rule_type": "all"
+    },
+    "user_id": "user_12345"
+}
+响应示例
+
+json
+{
+    "code": 0,
+    "message": "success",
+    "data": {
+        "booking": {
+            "advance_days": 3,
+            "max_duration_hours": 2,
+            "max_slots_per_day": 2,
+            "deposit_percent": 40,
+            "description": "可提前3天预约，单次最长2小时，每天最多预约2个时段，需支付40%定金"
+        },
+        "cancel": {
+            "advance_hours": 4,
+            "penalty": "提前4小时内取消或无理由爽约，记录1次违约"
+        },
+        "violation": {
+            "threshold": 3,
+            "penalty": "累计违约3次，冻结预约权限30天"
+        },
+        "checkin": {
+            "grace_minutes": 30,
+            "no_show_penalty": "预约开始后30分钟内未签到，自动标记为爽约"
+        }
+    }
+}
+6. 用户历史预约查询 (user_bookings)
+功能：查询指定用户的历史预约记录
+
+请求参数
+
+参数名	是否必填	类型	说明
+user_id	是	bigint	用户ID
+status	否	int	预约状态：0待支付、1已预约、2已取消、3已完成、4违约
+limit	否	int	返回条数，默认10
+请求示例
+
+json
+{
+    "query_type": "user_bookings",
+    "params": {
+        "user_id": 1,
+        "limit": 5
+    },
+    "user_id": "user_12345"
+}
+响应示例
+
+json
+{
+    "code": 0,
+    "message": "success",
+    "data": {
+        "total": 1,
+        "bookings": [
+            {
+                "booking_id": 1001,
+                "court_name": "篮球场1号",
+                "venue_name": "南校区体育中心",
+                "start_time": "2026-04-03 10:00:00",
+                "end_time": "2026-04-03 11:00:00",
+                "total_amount": 50.00,
+                "deposit_amount": 20.00,
+                "status": 1,
+                "status_desc": "已预约",
+                "checkin_time": null,
+                "cancel_time": null
+            }
+        ]
+    }
+}
+7. 用户违约记录查询 (user_violations)
+功能：查询指定用户的违约记录和信用分
+
+请求参数
+
+参数名	是否必填	类型	说明
+user_id	是	bigint	用户ID
+limit	否	int	返回条数，默认10
+请求示例
+
+json
+{
+    "query_type": "user_violations",
+    "params": {
+        "user_id": 2
+    },
+    "user_id": "user_12345"
+}
+响应示例
+
+json
+{
+    "code": 0,
+    "message": "success",
+    "data": {
+        "user_id": 2,
+        "username": "lisi",
+        "violation_count": 1,
+        "credit_score": 90,
+        "violations": [
+            {
+                "id": 1,
+                "booking_id": 1002,
+                "reason": "未按时到场",
+                "penalty_amount": 20.00,
+                "create_time": "2026-03-19 17:26:48",
+                "court_name": "篮球场1号",
+                "booking_time": "2026-04-03 10:00:00"
+            }
+        ]
+    }
+}
+通用响应格式
+成功响应
+json
+{
+    "code": 0,
+    "message": "success",
+    "data": { ... }
+}
+错误响应
+json
+{
+    "code": 400,
+    "message": "参数错误：缺少必填字段 'query_type'",
+    "detail": null
+}
+错误码对照表
+错误码	说明
+0	成功
+400	请求参数错误
+401	API Key 无效或已过期
+404	未找到相关数据
+429	请求过于频繁
+500	服务器内部错误
+Dify HTTP 节点配置示例
+在 Dify 工作流中添加 HTTP 请求节点，配置如下：
+
+配置项	填入内容
+URL	http://your-server-ip:5000/api/venue/query
+Method	POST
+Headers	Content-Type: application/json
+Authorization: Bearer your-api-key-here
+Body	选择 JSON 格式
+Body 模板：
+
+json
+{
+    "query_type": "{{#问题分类节点.class_label#}}",
+    "params": {
+        "keyword": "{{#sys.query#}}",
+        "user_id": "{{#开始节点.user_id#}}"
+    }
+}
+业务数据映射说明
+数据库表	用途	对应查询类型
+venue	场馆基本信息	venue_info
+court	场地信息与价格	court_info、pricing
+time_slot	时段与预约状态	court_availability
+booking	预约记录	user_bookings
+violation_log	违约记录	user_violations
+basic_user	用户信息与信用分	user_violations
+安全建议
+API Key 鉴权：生成唯一 API Key，每次请求在 Header 中验证
+
+SQL 注入防护：必须使用参数化查询或 MyBatis #{} 占位符
+
+数据脱敏：返回用户信息时，手机号建议中间四位打码
+
+限流保护：建议单 IP 每分钟最多 60 次请求
+
+日志记录：记录每次调用的 user_id、query_type、响应耗时
+
+快速测试（cURL）
+bash
+curl --location --request POST 'http://your-server-ip:5000/api/venue/query' \
+--header 'Content-Type: application/json' \
+--header 'Authorization: Bearer your-api-key-here' \
+--data-raw '{
+    "query_type": "venue_info",
+    "params": {
+        "keyword": "羽毛球"
+    },
+    "user_id": "test_user"
+}'

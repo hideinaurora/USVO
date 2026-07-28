@@ -1,5 +1,7 @@
 package org.example.service.booking.impl;
 
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.TypeReference;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -25,8 +27,10 @@ import org.example.mapper.booking.PaymentMapper;
 import org.example.mapper.booking.TimeSlotMapper;
 import org.example.mapper.venue.CourtMapper;
 import org.example.mapper.venue.VenueMapper;
+import org.example.mapper.basic.user.UserMapper;
 import org.example.service.basic.user.UserService;
 import org.example.service.booking.BookingService;
+import org.example.service.face.FaceService;
 import org.example.task.ViolationCheckTask;
 import org.example.vo.booking.AvailableSlotVO;
 import org.example.vo.booking.BookingCreateResultVO;
@@ -76,6 +80,10 @@ public class BookingServiceImpl implements BookingService {
     private VenueMapper venueMapper;
     @Resource
     private UserService userService;
+    @Resource
+    private UserMapper userMapper;
+    @Resource
+    private FaceService faceService;
     @Resource
     private org.example.mq.delayed.DelayedProducer delayedProducer;
     @Resource
@@ -522,21 +530,59 @@ public class BookingServiceImpl implements BookingService {
             throw new CommonJsonException(new OpResultDTO(400L, "已签到"));
         }
 
-        // 4. 更新预约表的签到时间
+        // 4. 人脸验证（如有签到图片）
+        if (dto.getCheckinImage() != null && !dto.getCheckinImage().isEmpty()) {
+            // 查询用户的人脸特征
+            UserEntity user = userMapper.selectById(userId);
+            if (user == null) {
+                throw new CommonJsonException(new OpResultDTO(404L, "用户不存在"));
+            }
+
+            String faceFeatureStr = user.getFaceFeature();
+            if (faceFeatureStr == null || faceFeatureStr.isEmpty()) {
+                throw new CommonJsonException(new OpResultDTO(400L, "您还未注册人脸，请先上传头像"));
+            }
+
+            // 解析已存储的人脸特征
+            List<Double> storedFeature;
+            try {
+                storedFeature = JSON.parseObject(faceFeatureStr, new TypeReference<List<Double>>() {});
+            } catch (Exception e) {
+                log.error("解析用户人脸特征失败: userId={}", userId, e);
+                throw new CommonJsonException(new OpResultDTO(500L, "人脸特征数据异常"));
+            }
+
+            // 调用人脸服务验证
+            try {
+                double similarity = faceService.verifyFace(dto.getCheckinImage(), storedFeature);
+                log.info("人脸验证结果: userId={}, bookingId={}, similarity={}", userId, dto.getBookingId(), similarity);
+
+                if (similarity < 0.5) {
+                    throw new CommonJsonException(new OpResultDTO(400L, "人脸验证失败，请确保是本人操作"));
+                }
+            } catch (CommonJsonException e) {
+                throw e;
+            } catch (Exception e) {
+                log.error("人脸验证异常: userId={}, error={}", userId, e.getMessage(), e);
+                throw new CommonJsonException(new OpResultDTO(500L, "人脸验证服务异常：" + e.getMessage()));
+            }
+        }
+
+        // 5. 更新预约表的签到时间
         LocalDateTime now = LocalDateTime.now();
         BookingEntity bu = new BookingEntity();
         bu.setId(booking.getId());
         bu.setCheckinTime(now);
         bookingMapper.updateById(bu);
 
-        // 5. 插入详细的签到日志
-        CheckinLogEntity log = new CheckinLogEntity();
-        log.setBookingId(booking.getId());
-        log.setUserId(userId);
-        log.setCheckinTime(now);
-        log.setCheckinType(dto.getCheckinType());
-        log.setDeviceId(dto.getDeviceId());
-        checkinLogMapper.insert(log);
+        // 6. 插入详细的签到日志
+        CheckinLogEntity logEntity = new CheckinLogEntity();
+        logEntity.setBookingId(booking.getId());
+        logEntity.setUserId(userId);
+        logEntity.setCheckinTime(now);
+        logEntity.setCheckinType(dto.getCheckinType());
+        logEntity.setDeviceId(dto.getDeviceId());
+        checkinLogMapper.insert(logEntity);
     }
 
     /**

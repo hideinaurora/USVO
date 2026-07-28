@@ -58,21 +58,14 @@ spring:
     url: jdbc:mysql://127.0.0.1:3306/nblg_apply
     username: root
     password: zhangk1103
-    maxActive: 4
-    initialSize: 1
-    maxWait: 60000
-    minIdle: 1
-    timeBetweenEvictionRunsMillis: 60000
-    minEvictableIdleTimeMillis: 300000
-    testWhileIdle: true
-    testOnBorrow: false
-    testOnReturn: false
-    poolPreparedStatements: true
-    maxOpenPreparedStatements: 20
-    asyncInit: true
-    filters: stat,wall,log4j
-    connectionProperties: druid.stat.mergeSql=true
 
+# 人脸识别服务配置
+face-service:
+  host: http://localhost:5000
+
+# Dify智能体接口配置
+dify:
+  api-key: app-tsu86BbVHg0p3fpGckJbfyxY
 
 logging:
   level:
